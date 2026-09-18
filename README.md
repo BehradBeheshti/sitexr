@@ -161,6 +161,20 @@ and every tour stop, plus a top-down map, into `test-output/survey/<siteId>/`. A
 `--views "name:x,z,lookX,lookY,lookZ;..."` to try candidate viewpoints before committing
 them to `src/config.ts`.
 
+### Recording a walkthrough video
+
+`node tools/record-demo.mjs <siteId>` renders a first-person walkthrough as an MP4, framed
+the way the headset view looks: 100° field of view, eye-height camera, walking head bob,
+blink transitions between shots and the in-VR panels (markers, note cards, the menu). The
+shot list for each site lives at the top of the script. It runs headless, so it needs
+neither a headset nor a working GPU — but on a software renderer each frame costs about a
+second and a half, so a 24-second clip takes roughly 15 minutes. Output goes to `media/`,
+frames to `test-output/frames/<siteId>/`.
+
+```sh
+node tools/record-demo.mjs komatsu --fps 24 --width 1280 --height 720
+```
+
 ## Project layout
 
 ```
@@ -178,7 +192,8 @@ src/xr/markers.ts           points of interest (VR + desktop)
 src/xr/tour.ts              guided tour state machine
 src/xr/tutorial.ts          first-time controller tutorial
 src/vendor/supersplat-viewer  vendored viewer runtime (MIT; see VENDORED.md for the patches)
-tools/                      asset pipeline, navigation grids, viewpoint survey, smoke test
+tools/                      asset pipeline, navigation grids, viewpoint survey, video
+                            recorder, smoke test
 ```
 
 ## Verification

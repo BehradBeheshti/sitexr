@@ -4,3 +4,4 @@ test-output/
 .DS_Store
 *.log
 public/scene-src/
+media/
