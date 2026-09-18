@@ -87,6 +87,28 @@ const loadGsplat = async (
     });
 };
 
+// SITEXR: load a `.glb` mesh model (a converted BIM export) and place it in the scene.
+const loadModel = (app: AppBase, url: string, transform: NonNullable<CreateViewerOptions['modelTransform']>) => {
+    return new Promise<Entity>((resolve, reject) => {
+        const asset = new Asset('model', 'container', { url });
+        asset.on('load', () => {
+            const entity = (asset.resource as { instantiateRenderEntity(): Entity }).instantiateRenderEntity();
+            const s = transform.scale ?? 1;
+            if (s !== 1) entity.setLocalScale(s, s, s);
+            if (transform.yaw) entity.setLocalEulerAngles(0, transform.yaw, 0);
+            if (transform.offset) entity.setLocalPosition(transform.offset[0], transform.offset[1], transform.offset[2]);
+            app.root.addChild(entity);
+            resolve(entity);
+        });
+        asset.on('error', (err) => {
+            console.log(err);
+            reject(err);
+        });
+        app.assets.add(asset);
+        app.assets.load(asset);
+    });
+};
+
 const loadSkybox = (app: AppBase, url: string) => {
     return new Promise<Asset>((resolve, reject) => {
         const asset = new Asset(
@@ -263,7 +285,10 @@ const resolveConfig = (options: CreateViewerOptions): Config => ({
     skyboxUrl: options.skyboxUrl,
     collisionUrl: options.collisionUrl,
     poster: options.poster ?? (options.posterUrl ? createImage(options.posterUrl) : undefined),
-    contents: options.contents ?? fetch(options.contentUrl),
+    // SITEXR: a model-only scene has no splat to fetch
+    contents: options.contents ?? (options.contentUrl ? fetch(options.contentUrl) : undefined),
+    modelUrl: options.modelUrl,
+    modelTransform: options.modelTransform,
     renderer: options.renderer ?? 'webgpu',
     ui: options.ui ?? true,
     noanim: options.noanim ?? false,
@@ -281,7 +306,8 @@ const resolveConfig = (options: CreateViewerOptions): Config => ({
     controllerProfilesUrl: options.controllerProfilesUrl, // SITEXR
     floorHeightAt: options.floorHeightAt, // SITEXR
     worldScale: options.worldScale, // SITEXR
-    collision: options.collision // SITEXR
+    collision: options.collision, // SITEXR
+    collisionFromModel: options.collisionFromModel // SITEXR
 });
 
 const createViewer = async (options: CreateViewerOptions): Promise<ViewerHandle> => {
@@ -390,14 +416,24 @@ const createViewer = async (options: CreateViewerOptions): Promise<ViewerHandle>
     let destroyed = false;
 
     // Load model
-    const gsplatLoad = loadGsplat(
-        app,
-        config,
-        (progress: number) => {
-            state.progress = progress;
-        },
-        () => destroyed
-    );
+    // SITEXR: no splat url means this scene is a mesh model
+    const gsplatLoad: Promise<Entity | null> = config.contentUrl
+        ? loadGsplat(
+            app,
+            config,
+            (progress: number) => {
+                state.progress = progress;
+            },
+            () => destroyed
+        )
+        : Promise.resolve(null);
+
+    const modelLoad: Promise<Entity | null> = config.modelUrl
+        ? loadModel(app, config.modelUrl, config.modelTransform ?? {}).catch((err: Error): null => {
+            console.warn('Failed to load model:', err);
+            return null;
+        })
+        : Promise.resolve(null);
 
     // Load skybox (continue without if it fails — e.g. CORS, 404)
     const skyboxLoad =
@@ -454,7 +490,7 @@ const createViewer = async (options: CreateViewerOptions): Promise<ViewerHandle>
     }
 
     // Create the viewer
-    const viewer = new Viewer(global, gsplatLoad, skyboxLoad, collisionLoad);
+    const viewer = new Viewer(global, gsplatLoad, skyboxLoad, collisionLoad, modelLoad);
     viewer.onDestroy(() => {
         destroyed = true;
     });
@@ -479,6 +515,7 @@ const createViewer = async (options: CreateViewerOptions): Promise<ViewerHandle>
             settings: global.settings,
             collision: collisionLoad ? collisionLoad.then((c) => c ?? null) : Promise.resolve(null),
             gsplat: gsplatLoad,
+            model: modelLoad,
             cameraManager: () => viewer.cameraManager ?? null
         }
     };

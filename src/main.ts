@@ -1,6 +1,7 @@
 // SiteXR — Immersive Construction Review. Bootstraps the splat viewer for the chosen site,
 // decides between immersive VR and the desktop walkthrough, and wires the SiteXR layer.
 import { Vec3, platform } from 'playcanvas';
+import type { Entity } from 'playcanvas';
 
 import { ASSETS, DEFAULT_SITE, EYE_HEIGHT, SITES, viewerSettings } from './config';
 import type { Poi, Site, TourStop } from './config';
@@ -9,6 +10,7 @@ import { Screens } from './ui/screens';
 import { createViewer } from './vendor/supersplat-viewer/index';
 import type { Collision } from './vendor/supersplat-viewer/collision';
 import { GridCollision } from './xr/grid-collision';
+import { collisionFromModel } from './xr/model-collision';
 import { Markers } from './xr/markers';
 import { VrMenu } from './xr/menu';
 import { getUiLayer } from './xr/panel';
@@ -132,13 +134,26 @@ const main = async () => {
         const collisionPromise: Promise<Collision | null> | undefined =
             site.collision.type === 'grid' ? GridCollision.load(site.collision.url) : undefined;
         let collision: Collision | null = null;
+        // built once from the instantiated model, and shared with the viewer
+        let meshCollision: Collision | null = null;
+        const buildMeshCollision = (model: unknown): Collision | null => {
+            meshCollision = meshCollision ?? collisionFromModel(model as Entity);
+            return meshCollision;
+        };
 
         const viewer = await createViewer({
             container,
             settings: viewerSettings(site),
             contentUrl: site.contentUrl,
+            // voxel collision is loaded by the viewer from a url; a navigation grid is
+            // ours, and mesh collision is read off the model once it is in the scene
             collisionUrl: site.collision.type === 'voxel' ? site.collision.url : undefined,
             collision: collisionPromise,
+            modelUrl: site.model?.url,
+            collisionFromModel: site.collision.type === 'mesh' ? buildMeshCollision : undefined,
+            modelTransform: site.model
+                ? { scale: site.model.scale, offset: site.model.offset, yaw: site.model.yaw }
+                : undefined,
             worldScale: site.worldScale,
             ui: false,
             nofx: true,
@@ -158,6 +173,10 @@ const main = async () => {
         });
 
         collision = await internals.collision;
+        if (site.collision.type === 'mesh') {
+            const model = await internals.model;
+            collision = model ? buildMeshCollision(model) : null;
+        }
         if (!collision) console.warn('SiteXR: collision data missing, terrain following disabled');
 
         const layer = getUiLayer(app, camera);

@@ -11,8 +11,10 @@ Three sites ship with the app, each with its own points of interest and guided t
 | **Muddy Excavator Site** | Earthworks with a tracked excavator on saturated, rutted ground | 1.0 m/unit |
 | **Heavy Plant Yard** | A 290-tonne mining haul truck and a PC4000 hydraulic shovel, at full size | 3.6 m/unit |
 | **Formwork & Scaffold Floor** | A floor under construction between slab-formwork shoring towers | 0.75 m/unit |
+| **Design Model (BIM)** | An IFC building model: design intent rather than a capture | 1.0 m/unit |
 
-All three scenes are Gaussian splat captures licensed CC BY 4.0 (see [Credits](#credits)).
+The first three are Gaussian splat captures licensed CC BY 4.0; the fourth is an
+MIT-licensed IFC sample model (see [Credits](#credits)).
 
 ## Linux development workflow
 
@@ -126,6 +128,37 @@ the collision data. It was measured from the capture itself: for the plant yard,
 machines of known type measure 2.0 and 2.2 units tall, giving 3.6 m/unit; for the formwork
 floor, the 5.7-unit deck-to-soffit distance and the 3.1-unit shoring grid give 0.75 m/unit.
 
+## Bringing in a BIM model
+
+A site can be a mesh model instead of (or as well as) a splat. IFC is converted to glTF
+once, offline:
+
+```sh
+pip install --user ifcopenshell
+python3 tools/ifc-to-glb.py source-assets/model.ifc /tmp/model.glb
+node tools/optimize-glb.mjs /tmp/model.glb public/bim/model.glb --ground 25
+```
+
+- `ifc-to-glb.py` triangulates every product with IfcOpenShell and keeps the IFC material
+  colours. `IfcSpace` and `IfcOpeningElement` are excluded by default: they are volumes,
+  not fabric, and would box the visitor in.
+- `optimize-glb.mjs` **bakes node transforms into the vertex data**, which is not optional.
+  IFC is Z-up and the converter expresses that as a rotation per node, and the collision
+  code reads vertex buffers without walking the node graph — an unbaked model collides in
+  a different orientation from the one you see. It then merges meshes by material and,
+  with `--ground`, adds a ground plane at the model's base so the building can be
+  approached from outside rather than falling past it.
+
+Then add a site to `src/config.ts` with `model: { url }` and `collision: { type: 'mesh' }`.
+The mesh is its own collision surface: walls stop you, floors carry you, and the teleport
+arc lands on them. `src/xr/model-collision.ts` reads the triangles off the instantiated
+entity rather than downloading the glb twice — the engine caches by url, so a second
+asset's unload would destroy the geometry the first one is drawing.
+
+A `model` can also sit on a splat site, with `scale`, `offset` and `yaw` to register the
+design model against the capture. That comparison, design against as-built, is the point
+of taking BIM into the headset.
+
 ## Asset pipeline (Linux, Node only)
 
 `source-assets/` holds the downloaded scenes; `public/scene*/` holds what the app serves.
@@ -192,8 +225,9 @@ src/xr/markers.ts           points of interest (VR + desktop)
 src/xr/tour.ts              guided tour state machine
 src/xr/tutorial.ts          first-time controller tutorial
 src/vendor/supersplat-viewer  vendored viewer runtime (MIT; see VENDORED.md for the patches)
-tools/                      asset pipeline, navigation grids, viewpoint survey, video
-                            recorder, desktop smoke test, emulated-VR session test
+tools/                      asset pipeline, IFC to glTF conversion, navigation grids,
+                            viewpoint survey, video recorder, desktop smoke test,
+                            emulated-VR session test
 ```
 
 ## First run on a Quest 3
@@ -220,7 +254,7 @@ Two suites, both headless, both runnable without a headset:
 ```sh
 npm run test        # build + desktop suite
 npm run test:vr     # one emulated VR session (add a site id)
-npm run test:all    # build + desktop suite + VR session on each of the three sites
+npm run test:all    # build + desktop suite + a VR session on every site
 ```
 
 ### Emulated VR
@@ -259,6 +293,10 @@ viewport sizes, and every site in the picker loads and enters its walkthrough. S
   - “Muddy Excavator Site” by dok11 — https://superspl.at/scene/ded12920
   - “こまつの杜 (Komatsu no Mori)” by gnehs — https://superspl.at/scene/892bab3d
   - “Construction next day” by redmancg — https://superspl.at/scene/73d39431
+
+- **BIM model:** “LargeBuilding” from
+  [bim-whale-ifc-samples](https://github.com/andrewisen/bim-whale-ifc-samples) by andrewisen,
+  MIT. Converted from IFC to glTF, transforms baked, meshes merged and a ground plane added.
 
   Changes in all three: re-encoded as multi-level-of-detail streaming data with spherical
   harmonics reduced to one band, rescaled to metres, and navigation data derived for

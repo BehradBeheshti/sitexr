@@ -14,8 +14,15 @@
  * `renderViewerHtml` — so the two surfaces cannot drift.
  */
 type ViewerAssets = {
-    /** Splat url. May be a `data:` uri, for a document with no sibling files. */
-    contentUrl: string;
+    /**
+     * Splat url. May be a `data:` uri, for a document with no sibling files.
+     * SITEXR: optional, so a scene can be a mesh model (a BIM export) with no splat.
+     */
+    contentUrl?: string;
+    /** SITEXR: a `.glb` mesh model to place in the scene, on its own or over a splat. */
+    modelUrl?: string;
+    /** SITEXR: how that model is placed: metres per unit, world offset, Y rotation. */
+    modelTransform?: { scale?: number; offset?: [number, number, number]; yaw?: number };
     /**
      * Filename describing {@link ViewerAssets.contentUrl}, e.g. `scene.sog`. The splat format
      * is chosen by the name's extension, so this is required when the url itself has no usable
@@ -75,6 +82,13 @@ type ViewerFlags = {
     worldScale?: number;
     /** SITEXR: a collision implementation supplied by the host, instead of `collisionUrl`. */
     collision?: Promise<unknown | null>;
+    /**
+     * SITEXR: build collision from the loaded mesh model. A BIM export is its own
+     * collision surface, and reading it off the instantiated entity avoids downloading
+     * the same glb twice (the engine caches by url, so the second asset's unload would
+     * destroy the first one's geometry).
+     */
+    collisionFromModel?: (model: unknown) => unknown | null;
     /**
      * Publish `window.app`, `scrubTo`, `captureFrame`, `animationDuration` and the debug panel's
      * camera-state hooks. The standalone document turns this on for the thumbnail pipeline; an

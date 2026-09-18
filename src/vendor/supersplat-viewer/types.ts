@@ -19,10 +19,10 @@ type InputMode = 'desktop' | 'touch';
 // the createViewer options with every default applied: what the viewer reads at runtime, and
 // immutable once it starts. The flags are documented on ViewerFlags
 type Config = ViewerAssets &
-    Required<Omit<ViewerFlags, 'hpr' | 'budget' | 'lang' | 'controllerProfilesUrl' | 'floorHeightAt' | 'worldScale' | 'collision'>> &
-    Pick<ViewerFlags, 'hpr' | 'budget' | 'lang' | 'controllerProfilesUrl' | 'floorHeightAt' | 'worldScale' | 'collision'> & {
+    Required<Omit<ViewerFlags, 'hpr' | 'budget' | 'lang' | 'controllerProfilesUrl' | 'floorHeightAt' | 'worldScale' | 'collision' | 'collisionFromModel'>> &
+    Pick<ViewerFlags, 'hpr' | 'budget' | 'lang' | 'controllerProfilesUrl' | 'floorHeightAt' | 'worldScale' | 'collision' | 'collisionFromModel'> & {
         poster?: HTMLImageElement;
-        contents: Promise<Response>;
+        contents?: Promise<Response>; // SITEXR: absent for a model-only scene
     };
 
 // observable state that can change at runtime
@@ -133,7 +133,8 @@ type ViewerHandle = {
         camera: Entity;
         settings: ExperienceSettings;
         collision: Promise<Collision | null>;
-        gsplat: Promise<Entity>;
+        gsplat: Promise<Entity | null>;
+        model: Promise<Entity | null>;
         cameraManager: () => CameraManager | null;
     };
 };

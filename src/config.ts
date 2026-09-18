@@ -56,8 +56,14 @@ export type Site = {
     /** Short tag shown on the site card. */
     tag: string;
     poster: string;
-    contentUrl: string;
-    collision: { type: 'voxel' | 'grid'; url: string };
+    /** Splat scene. Omitted for a model-only site, such as a BIM export. */
+    contentUrl?: string;
+    /**
+     * A `.glb` mesh model placed in the scene: a BIM export on its own, or a design model
+     * over a captured site once the two are registered to each other.
+     */
+    model?: { url: string; scale?: number; offset?: [number, number, number]; yaw?: number };
+    collision: { type: 'voxel' | 'grid' | 'mesh'; url: string };
     /** Metres per scene unit. */
     worldScale: number;
     /** Arrival point, look target and an approximate floor height for the first camera. */
@@ -247,7 +253,66 @@ const scaffold: Site = {
     }
 };
 
-export const SITES: Site[] = [excavator, komatsu, scaffold];
+// A design model rather than a capture: an IFC building export converted to glTF. The
+// mesh is its own collision surface, so walls stop you and the floors carry you, which is
+// what a BIM review needs. See tools/ifc-to-glb.py for the conversion.
+const bim: Site = {
+    id: 'bim',
+    name: 'Design Model (BIM)',
+    subtitle: 'IFC building model · design intent, not a capture',
+    blurb: 'Walk around a building information model at full size: the building as drawn, before anything is built.',
+    tag: 'BIM model',
+    poster: 'brand/poster-bim.webp',
+    model: { url: 'bim/office.glb' },
+    collision: { type: 'mesh', url: 'bim/office.glb' },
+    worldScale: 1,
+    spawn: { x: 0, z: 30, floor: -0.15, look: [0, 4.0, 0] },
+    walkRadius: 55,
+    background: [0.62, 0.66, 0.72],
+    pois: [
+        {
+            id: 'facade',
+            index: 1,
+            title: 'Facade & openings',
+            text: 'Windows and doors at their modelled positions and storey heights. This is what a design review checks against the opening schedule, and later against the as-built survey.',
+            marker: [-10.0, 4.2, 3.0],
+            stand: { x: -22.0, z: 18.0, look: [-10.0, 3.5, 2.0] }
+        },
+        {
+            id: 'roof',
+            index: 2,
+            title: 'Roof line & canopy',
+            text: 'The second block with its canopy. Standing beside it at full size is the quickest way to judge eaves height and how the two roof lines meet.',
+            marker: [12.0, 5.2, 2.0],
+            stand: { x: 20.0, z: 16.0, look: [12.0, 4.5, 2.0] }
+        },
+        {
+            id: 'layout',
+            index: 3,
+            title: 'Site layout',
+            text: 'How the blocks sit together, with the planting and the approach between them. The model is its own collision surface, so the walls stop you and the ground carries you.',
+            marker: [2.0, 2.0, 10.0],
+            stand: { x: 0.0, z: 30.0, look: [0, 4.0, 0] }
+        }
+    ],
+    tour: [
+        { title: 'Approach', text: 'A design model rather than a capture: the building as drawn, at full size.', x: 0, z: 30, look: [0, 4.0, 0], dwell: 9 },
+        { title: 'Facade', text: 'Openings, storey heights and the roof line as modelled.', x: -22.0, z: 18.0, look: [-10.0, 3.5, 2.0], dwell: 10 },
+        { title: 'Along the block', text: 'The long elevation. Walk it the way you would walk a real hoarding line.', x: -25.0, z: 10.0, look: [-10.0, 4.0, -6.0], dwell: 10 },
+        { title: 'Second block', text: 'The smaller block and its canopy, and how the two roof lines meet.', x: 20.0, z: 16.0, look: [12.0, 4.5, 2.0], dwell: 10 },
+        { title: 'End of tour', text: 'Back at the approach. Explore the model, or press B for the menu.', x: 0, z: 30, look: [0, 4.0, 0], dwell: 6 }
+    ],
+    credits: {
+        sceneTitle: 'LargeBuilding (IFC sample model)',
+        sceneAuthor: 'andrewisen, bim-whale-ifc-samples',
+        sceneLicense: 'MIT',
+        sceneLicenseUrl: 'https://github.com/andrewisen/bim-whale-ifc-samples/blob/main/LICENSE',
+        sceneSourceUrl: 'https://github.com/andrewisen/bim-whale-ifc-samples',
+        changes: 'Converted from IFC to glTF with IfcOpenShell, node transforms baked in, meshes merged by material, a ground plane added so the model can be approached from outside, and the mesh used as its own collision surface.'
+    }
+};
+
+export const SITES: Site[] = [excavator, komatsu, scaffold, bim];
 export const DEFAULT_SITE = excavator.id;
 
 /** Viewer experience settings (schema v2) for a site. Post effects stay off for a matching XR/desktop look. */

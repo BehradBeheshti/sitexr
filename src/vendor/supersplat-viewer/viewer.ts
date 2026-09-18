@@ -227,9 +227,10 @@ class Viewer {
 
     constructor(
         global: Global,
-        gsplatLoad: Promise<Entity>,
+        gsplatLoad: Promise<Entity | null>,
         skyboxLoad: Promise<void> | undefined,
-        collisionLoad: Promise<Collision> | undefined
+        collisionLoad: Promise<Collision> | undefined,
+        modelLoad: Promise<Entity | null> = Promise.resolve(null) // SITEXR: mesh model
     ) {
         this.global = global;
 
@@ -450,7 +451,7 @@ class Viewer {
 
         if (!config.fullload) {
             gsplatLoad.then((entity) => {
-                if (this.destroyed) return;
+                if (this.destroyed || !entity) return;
                 const gsplatComponent = entity.gsplat as GSplatComponent;
                 const resource = gsplatComponent.resource as GSplatOctreeResourceLike | null;
                 const lodLevels = resource?.octree?.lodLevels;
@@ -461,17 +462,34 @@ class Viewer {
         }
 
         // wait for the model to load
-        Promise.all([gsplatLoad, skyboxLoad, collisionLoad]).then((results) => {
+        Promise.all([gsplatLoad, skyboxLoad, collisionLoad, modelLoad]).then((results) => {
             // destroyed while loading: the app is gone, so there is nothing to wire up
             if (this.destroyed) return;
 
-            const gsplatComponent = results[0].gsplat as GSplatComponent;
-            const collision = results[2];
+            const gsplatEntity = results[0];
+            const gsplatComponent = gsplatEntity?.gsplat as GSplatComponent | undefined;
+            const modelEntity = results[3];
+            // SITEXR: a mesh model can be its own collision surface
+            const collision =
+                results[2] ??
+                (modelEntity && config.collisionFromModel
+                    ? ((config.collisionFromModel(modelEntity) as Collision | null) ?? undefined)
+                    : undefined);
 
             // get scene bounding box
-            const gsplatBbox = gsplatComponent.customAabb;
-            if (gsplatBbox) {
-                sceneBound.setFromTransformedAabb(gsplatBbox, results[0].getWorldTransform());
+            const gsplatBbox = gsplatComponent?.customAabb;
+            if (gsplatBbox && gsplatEntity) {
+                sceneBound.setFromTransformedAabb(gsplatBbox, gsplatEntity.getWorldTransform());
+            } else if (modelEntity) {
+                // SITEXR: a model-only scene takes its bounds from the mesh instances
+                const renders = modelEntity.findComponents('render') as unknown as { meshInstances: { aabb: BoundingBox }[] }[];
+                const instances = renders.flatMap((r) => r.meshInstances);
+                if (instances.length > 0) {
+                    sceneBound.copy(instances[0].aabb);
+                    for (let i = 1; i < instances.length; i++) {
+                        sceneBound.add(instances[i].aabb);
+                    }
+                }
             }
 
             if (config.ui) {
@@ -518,6 +536,19 @@ class Viewer {
             }
 
             this.debugPanel = new DebugPanel(global, this.cameraManager);
+
+            // SITEXR: a model-only scene has no splat streaming to wait on, so it is ready
+            // as soon as one frame has been drawn.
+            if (!gsplatComponent) {
+                state.progress = 100;
+                app.renderNextFrame = true;
+                app.once('frameend', () => {
+                    app.autoRender = false;
+                    events.fire('firstFrame');
+                    window.firstFrame?.();
+                });
+                return;
+            }
 
             // quality budget
             const budgets = {
