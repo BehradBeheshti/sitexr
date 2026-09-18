@@ -71,6 +71,10 @@ type ViewerFlags = {
     controllerProfilesUrl?: string;
     /** SITEXR: terrain height under a world position, used to place the XR rig on entry. */
     floorHeightAt?: (x: number, y: number, z: number) => number | null;
+    /** SITEXR: uniform scale applied to the splat so scenes captured in other units are metric. */
+    worldScale?: number;
+    /** SITEXR: a collision implementation supplied by the host, instead of `collisionUrl`. */
+    collision?: Promise<unknown | null>;
     /**
      * Publish `window.app`, `scrubTo`, `captureFrame`, `animationDuration` and the debug panel's
      * camera-state hooks. The standalone document turns this on for the thumbnail pipeline; an

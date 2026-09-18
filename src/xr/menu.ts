@@ -1,6 +1,7 @@
 // The in-VR menu: Resume, Reset Position, Guided Tour, Comfort Settings, About, Exit VR.
 // Opens 1.3 m ahead of the visitor and pauses locomotion while it is up.
-import { CREDITS, BRAND } from '../config';
+import { BRAND, TECH_CREDIT } from '../config';
+import type { Site } from '../config';
 import { settings } from '../settings';
 import type { Comfort } from '../settings';
 import { Panel, THEME, drawButton, drawPanelBackground, wrapText } from './panel';
@@ -13,6 +14,9 @@ export type MenuActions = {
     tourActive: () => boolean;
     toggleTour: () => void;
     replayTutorial: () => void;
+    /** Leave VR and return to the site picker. */
+    switchSite: () => void;
+    site: Site;
 };
 
 export class VrMenu {
@@ -30,9 +34,17 @@ export class VrMenu {
         this.panel = new Panel(rig.app, rig.layer, { name: 'menu', width: 0.72, height: 0.66, pixels: 1024, overlay: true });
         this.panel.onHoverChange = () => this.render();
         this.panel.onButton = (id) => this.onButton(id);
-        settings.events.on('change', () => {
+        this.onSettings = () => {
             if (this.isOpen) this.render();
-        });
+        };
+        settings.events.on('change', this.onSettings);
+    }
+
+    private onSettings: () => void;
+
+    dispose() {
+        settings.events.off('change', this.onSettings);
+        this.close();
     }
 
     get isOpen() {
@@ -83,6 +95,10 @@ export class VrMenu {
                 this.close();
                 this.rig.exitVr();
                 break;
+            case 'switch':
+                this.close();
+                this.actions.switchSite();
+                break;
             case 'back':
                 this.page = 'main';
                 break;
@@ -126,7 +142,7 @@ export class VrMenu {
         ctx.fillStyle = THEME.muted;
         ctx.font = `400 26px ${THEME.font}`;
         ctx.textAlign = 'right';
-        ctx.fillText(BRAND.site, w - 48, 66);
+        ctx.fillText(this.actions.site.name, w - 48, 66);
 
         const items: [string, string, boolean?][] = [
             ['resume', 'Resume'],
@@ -134,15 +150,16 @@ export class VrMenu {
             ['tour', this.actions.tourActive() ? 'Stop guided tour' : 'Start guided tour'],
             ['comfort', 'Comfort settings'],
             ['about', 'About & credits'],
+            ['switch', 'Switch site'],
             ['exit', 'Exit VR', true]
         ];
         const bw = w - 96;
-        const bh = 108;
-        let y = 128;
+        const bh = 94;
+        let y = 122;
         for (const [id, label, danger] of items) {
             const b = this.button(id, 48, y, bw, bh);
-            drawButton(ctx, b, label, { hover: this.panel.hover === id, primary: id === 'resume', danger, size: 34 });
-            y += bh + 18;
+            drawButton(ctx, b, label, { hover: this.panel.hover === id, primary: id === 'resume', danger, size: 32 });
+            y += bh + 14;
         }
         ctx.fillStyle = THEME.muted;
         ctx.font = `400 24px ${THEME.font}`;
@@ -208,8 +225,9 @@ export class VrMenu {
         y += 40;
         ctx.fillStyle = THEME.muted;
         ctx.font = `400 26px ${THEME.font}`;
-        y = wrapText(ctx, `“${CREDITS.sceneTitle}” by ${CREDITS.sceneAuthor}, licensed ${CREDITS.sceneLicense}.`, 48, y, w - 96, 36);
-        y = wrapText(ctx, `Changes: ${CREDITS.changes}`, 48, y + 4, w - 96, 34);
+        const c = this.actions.site.credits;
+        y = wrapText(ctx, `“${c.sceneTitle}” by ${c.sceneAuthor}, licensed ${c.sceneLicense}.`, 48, y, w - 96, 36);
+        y = wrapText(ctx, `Changes: ${c.changes}`, 48, y + 4, w - 96, 34);
 
         y += 22;
         ctx.fillStyle = THEME.text;
@@ -218,7 +236,7 @@ export class VrMenu {
         y += 40;
         ctx.fillStyle = THEME.muted;
         ctx.font = `400 26px ${THEME.font}`;
-        y = wrapText(ctx, CREDITS.tech, 48, y, w - 96, 34);
+        y = wrapText(ctx, TECH_CREDIT, 48, y, w - 96, 34);
 
         const bb = this.button('back', 48, h - 128, w - 96, 84);
         drawButton(ctx, bb, 'Back', { hover: this.panel.hover === 'back', primary: true, size: 30 });

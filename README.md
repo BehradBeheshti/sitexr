@@ -1,11 +1,18 @@
 # SiteXR — Immersive Construction Review
 
-A purpose-built Meta Quest 3 WebXR experience for walking a captured excavation site at
-true scale: inspect the tracked excavator, review ground and track condition, and check
-site access and terrain. Built on the PlayCanvas engine and the open-source SuperSplat
-viewer runtime, self-hosted as a static site over HTTPS.
+A purpose-built Meta Quest 3 WebXR experience for walking captured construction sites at
+true scale. Built on the PlayCanvas engine and the open-source SuperSplat viewer runtime,
+self-hosted as a static site over HTTPS.
 
-Scene: “Muddy Excavator Site” by dok11, licensed CC BY 4.0 (see [Credits](#credits)).
+Three sites ship with the app, each with its own points of interest and guided tour:
+
+| Site | What it is | Scale |
+| --- | --- | --- |
+| **Muddy Excavator Site** | Earthworks with a tracked excavator on saturated, rutted ground | 1.0 m/unit |
+| **Heavy Plant Yard** | A 290-tonne mining haul truck and a PC4000 hydraulic shovel, at full size | 3.6 m/unit |
+| **Formwork & Scaffold Floor** | A floor under construction between slab-formwork shoring towers | 0.75 m/unit |
+
+All three scenes are Gaussian splat captures licensed CC BY 4.0 (see [Credits](#credits)).
 
 ## Linux development workflow
 
@@ -68,13 +75,13 @@ rsync -a dist/ user@host:/var/www/sitexr/
 | A or trigger during the tour (not pointing at UI) | Next tour stop |
 
 The in-VR menu contains **Resume, Reset position, Guided tour, Comfort settings, About &
-credits, Exit VR**. Comfort settings: turning mode, walk speed (1.1 / 1.6 / 2.4 m/s),
+credits, Switch site, Exit VR**. Switching sites leaves VR and returns to the site picker,
+since a new scene has to stream in. Comfort settings: turning mode, walk speed (1.1 / 1.6 / 2.4 m/s),
 movement vignette, teleport on/off, quality (splat budget and render scale). Settings
 persist on the device.
 
-**Reset behaviour.** Reset places the visitor at the arrival point on the haul surface
-(about 10 m in front of the excavator), rotates the world so they face the machine, and
-puts the floor at the terrain height under the head. It is a blink (fade to black), never
+**Reset behaviour.** Reset places the visitor at that site's arrival point, rotates the
+world so they face the subject, and puts the floor at the terrain height under the head. It is a blink (fade to black), never
 a slide. The same logic runs automatically three frames after a VR session starts, so the
 visitor never spawns inside the splat or above the ground.
 
@@ -95,52 +102,83 @@ visitor never spawns inside the splat or above the ground.
 The viewer's engine-level `XrNavigation` script provides thumbstick movement, snap/smooth
 turning and the ballistic teleport arc. SiteXR extends it in `src/xr/rig.ts`:
 
-- **Terrain following** — five downward rays from the head into the voxel collision data
+- **Terrain following** — five downward rays from the head into the site's collision data
   set the floor height every frame (spring-damped); a step higher than 0.55 m is treated
   as a wall and the move is rejected.
-- **Walk capsule** — the visitor is pushed out of solid voxels horizontally, so they
-  cannot walk through the excavator or off the edge of the scan (24 m radius).
-- **Teleport validation** — the arc is cast through the voxel data; a landing spot must
-  be walkable (surface normal ≥ 0.6), inside the site, carved as free space, and have
-  1.6 m of headroom. Invalid targets show the red arc.
+- **Walk capsule** — the visitor is pushed out of solid space horizontally, so they cannot
+  walk through a machine or off the edge of the scan.
+- **Teleport validation** — the arc is cast through the collision data; a landing spot must
+  be walkable, inside the site, and have 1.6 m of headroom. Invalid targets show a red arc.
 - **Blink transitions** — teleports, resets and tour travel fade to black, move, fade in.
+
+### Two kinds of collision data
+
+The excavator site ships the voxel octree published with the scene, read by the viewer's
+own `VoxelCollision`. The other two sites have no published voxel data, so SiteXR derives a
+**navigation grid** from the splats instead (`tools/build-navgrid.py` → `public/nav/*.json`
++ `.bin`): per cell a floor height, a ceiling height and a walkable flag, flood-filled from
+a seed and eroded by a keep-out margin. `src/xr/grid-collision.ts` implements the same
+`Collision` interface over that grid, so walk mode, spawn search, the capsule and the
+teleport arc work identically on either kind of site.
+
+Each site declares `worldScale`, the metres-per-scene-unit factor applied to the splat and
+the collision data. It was measured from the capture itself: for the plant yard, two
+machines of known type measure 2.0 and 2.2 units tall, giving 3.6 m/unit; for the formwork
+floor, the 5.7-unit deck-to-soffit distance and the 3.1-unit shoring grid give 0.75 m/unit.
 
 ## Asset pipeline (Linux, Node only)
 
-`source-assets/` holds the downloaded CC BY scene (SOG `meta.json` + WebP textures, and
-the voxel collision data). `public/scene/` holds what the app serves. To rebuild it:
+`source-assets/` holds the downloaded scenes; `public/scene*/` holds what the app serves.
 
 ```sh
-npm run assets     # runs tools/build-scene.sh → public/scene/lod-meta.json + chunks
+# 1. fetch a published scene (only where the author enabled downloads under CC BY)
+node tools/fetch-scene.mjs 892bab3d source-assets/komatsu
+
+# 2. re-encode it for the headset
+tools/build-scene.sh excavator      # full SOG  -> 4-level streamed SOG + voxel collision
+tools/build-scene.sh komatsu        # streamed SOG -> lighter 3-level cut
+tools/build-scene.sh scaffold
+
+# 3. build the navigation grid for a site without published voxel data
+#    (needs a CSV export of one detail level, produced with splat-transform)
+npx splat-transform source-assets/komatsu/lod-meta.json -L 2 /tmp/komatsu.csv
+python3 tools/build-navgrid.py /tmp/komatsu.csv public/nav/komatsu \
+    --scale 3.6 --cell 0.1 --step 0.35 --margin 0.45 --box=-10,-10,10,10 --seed=1.5,3.5
 ```
 
-The script uses `@playcanvas/splat-transform` to:
+`build-navgrid.py` prints an ASCII map of the walkable region, which is how the spawn,
+marker and tour coordinates in `src/config.ts` were chosen. `--floor-band lo,hi` pins the
+floor to a flat slab, which the formwork site needs because the deck is mostly hidden
+behind shoring.
 
-1. Read the SOG, drop invalid Gaussians and reduce spherical harmonics to one band
-   (cheaper per-splat shading on the headset).
-2. Decimate to 40 %, 15 % and 5 % for LOD levels 1–3.
-3. Bundle all four levels into a Streamed SOG (`lod-meta.json`) with 12 m chunks so the
-   engine streams and swaps detail to fit the splat budget (0.7–1.8 M splats on Quest).
+`npm run assets` runs step 2 for the excavator site. Controller models are copied from
+`@webxr-input-profiles/assets` by `node tools/sync-controller-profiles.mjs`.
 
-Controller models are copied from `@webxr-input-profiles/assets` by
-`node tools/sync-controller-profiles.mjs` and served from `public/controllers/`.
+### Reviewing a site's viewpoints
+
+`node tools/survey.mjs <siteId>` renders the site from its spawn, every point of interest
+and every tour stop, plus a top-down map, into `test-output/survey/<siteId>/`. Add
+`--views "name:x,z,lookX,lookY,lookZ;..."` to try candidate viewpoints before committing
+them to `src/config.ts`.
 
 ## Project layout
 
 ```
 index.html                  app shell (loading, welcome, credits, settings, desktop HUD)
 src/main.ts                 bootstrap: XR detection, viewer creation, wiring
-src/config.ts               scene URLs, spawn, points of interest, tour stops, credits
+src/config.ts               the site catalogue: scene urls, scale, spawn, points of
+                            interest, tour stops and credits, one entry per site
 src/settings.ts             comfort/quality settings store (localStorage)
 src/ui/screens.ts           DOM screens
 src/xr/rig.ts               XR rig: locomotion, terrain following, teleport, fades, pointers
+src/xr/grid-collision.ts    navigation-grid collision for sites without voxel data
 src/xr/panel.ts             canvas-textured VR surfaces + drawing helpers
 src/xr/menu.ts              in-VR menu
 src/xr/markers.ts           points of interest (VR + desktop)
 src/xr/tour.ts              guided tour state machine
 src/xr/tutorial.ts          first-time controller tutorial
 src/vendor/supersplat-viewer  vendored viewer runtime (MIT; see VENDORED.md for the patches)
-tools/                      asset pipeline, controller profile sync, smoke test
+tools/                      asset pipeline, navigation grids, viewpoint survey, smoke test
 ```
 
 ## Verification
@@ -148,14 +186,19 @@ tools/                      asset pipeline, controller profile sync, smoke test
 `npm run test` builds and runs `tools/smoke-test.mjs` in headless Chrome: the scene loads
 from the self-hosted build, no runtime console errors, no iframe, no SuperSplat/localhost
 wording, no page scrollbar, the VR button only offers VR when `immersive-vr` is supported,
-and the desktop walkthrough, tour and settings work at desktop, Quest-browser and phone
-viewport sizes. Screenshots land in `test-output/`.
+the desktop walkthrough, tour and settings work at desktop, Quest-browser and phone
+viewport sizes, and every site in the picker loads and enters its walkthrough. Screenshots land in `test-output/`.
 
 ## Credits
 
-- **Scene:** “Muddy Excavator Site” by dok11 — [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/),
-  source: https://superspl.at/scene/ded12920. Changes: converted to a multi-LOD streaming
-  format, spherical harmonics reduced to one band, voxel collision data used for navigation.
+- **Scenes**, each [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/):
+  - “Muddy Excavator Site” by dok11 — https://superspl.at/scene/ded12920
+  - “こまつの杜 (Komatsu no Mori)” by gnehs — https://superspl.at/scene/892bab3d
+  - “Construction next day” by redmancg — https://superspl.at/scene/73d39431
+
+  Changes in all three: re-encoded as multi-level-of-detail streaming data with spherical
+  harmonics reduced to one band, rescaled to metres, and navigation data derived for
+  walking. Each site's own credits screen names its author and licence in the app.
 - **Engine:** [PlayCanvas](https://playcanvas.com) (MIT).
 - **Viewer runtime:** SuperSplat viewer (MIT), vendored under `src/vendor/supersplat-viewer`.
 - **Controller models:** [WebXR Input Profiles](https://github.com/immersive-web/webxr-input-profiles) (Apache-2.0).

@@ -1,12 +1,16 @@
 // The DOM side of SiteXR: loading / welcome overlay, the desktop walkthrough HUD, the
 // settings and credits modals. Nothing here is visible inside an immersive session.
-import type { Poi, TourStop } from '../config';
+import type { Poi, Site, TourStop } from '../config';
 import { settings } from '../settings';
 import type { Comfort } from '../settings';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 
 export type ScreenCallbacks = {
+    sites: Site[];
+    selected: string;
+    onSelectSite: (id: string) => void;
+    onChangeSite: () => void;
     onEnter: () => void;
     onTour: () => void;
     onTourNext: () => void;
@@ -21,8 +25,14 @@ export class Screens {
 
     private currentPoi: Poi | null = null;
 
+    private site: Site;
+
     constructor(cb: ScreenCallbacks) {
         this.cb = cb;
+        this.site = cb.sites.find((s) => s.id === cb.selected) ?? cb.sites[0];
+        this.renderSites();
+        this.applySite();
+        $('hud-site').addEventListener('click', () => cb.onChangeSite());
         $('enter').addEventListener('click', () => cb.onEnter());
         $('open-settings').addEventListener('click', () => this.openModal('modal-settings'));
         $('open-credits').addEventListener('click', () => this.openModal('modal-credits'));
@@ -51,6 +61,67 @@ export class Screens {
         window.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') this.closeModals();
         });
+    }
+
+    // ---- site picker -------------------------------------------------------------------------
+
+    private renderSites() {
+        const host = $('sites');
+        host.innerHTML = '';
+        for (const site of this.cb.sites) {
+            const b = document.createElement('button');
+            b.className = 'site';
+            b.type = 'button';
+            b.dataset.id = site.id;
+            b.setAttribute('aria-pressed', String(site.id === this.site.id));
+            const poster = new URL(site.poster, document.baseURI).href;
+            b.innerHTML = `<span class="site-img" style="background-image:url('${poster}')"></span>
+                <span class="site-body"><span class="site-tag">${site.tag}</span><span class="site-name">${site.name}</span></span>`;
+            b.addEventListener('click', () => {
+                if (site.id !== this.site.id) this.cb.onSelectSite(site.id);
+            });
+            host.appendChild(b);
+        }
+    }
+
+    setSelected(id: string) {
+        this.site = this.cb.sites.find((s) => s.id === id) ?? this.site;
+        document.querySelectorAll<HTMLElement>('#sites .site').forEach((el) => {
+            el.setAttribute('aria-pressed', String(el.dataset.id === id));
+        });
+        this.applySite();
+    }
+
+    private applySite() {
+        const s = this.site;
+        $('site-title').textContent = s.name;
+        $('site-eyebrow').textContent = `Site capture · ${s.subtitle}`;
+        $('site-lede').textContent = s.blurb;
+        $('hud-site-name').textContent = s.name;
+        const c = s.credits;
+        $('credit-scene').innerHTML = `“${c.sceneTitle}” by ${c.sceneAuthor} — licensed <a href="${c.sceneLicenseUrl}" target="_blank" rel="noopener">${c.sceneLicense}</a>. Source: <a href="${c.sceneSourceUrl}" target="_blank" rel="noopener">original scene</a>.<br /><span class="muted">Changes: ${c.changes}</span>`;
+        const bd = document.querySelector<HTMLElement>('.overlay .backdrop');
+        if (bd) bd.style.setProperty('--poster', `url('${new URL(s.poster, document.baseURI).href}')`);
+    }
+
+    /** Back to the loading state for a newly selected site. */
+    setLoading(site: Site) {
+        this.site = site;
+        this.applySite();
+        const overlay = $('overlay');
+        overlay.dataset.state = 'loading';
+        overlay.hidden = false;
+        overlay.classList.remove('fading');
+        const btn = $<HTMLButtonElement>('enter');
+        btn.disabled = true;
+        $('enter-sub').textContent = 'Loading…';
+        $('mode-note').textContent = '';
+        this.setProgress(2, 'Connecting to site data…');
+        this.hideHud();
+    }
+
+    get welcomeHidden() {
+        return $('overlay').hidden;
     }
 
     // ---- loading / welcome -------------------------------------------------------------
@@ -95,8 +166,14 @@ export class Screens {
         }, 480);
     }
 
-    setLoadError(message: string) {
-        $('progress-label').textContent = message;
+    setLoadError(kind: string) {
+        const noGraphics = kind === 'no-graphics';
+        $('progress-label').textContent = noGraphics
+            ? '3D graphics are unavailable in this browser.'
+            : 'The site could not be loaded. Please refresh to try again.';
+        $('mode-note').textContent = noGraphics
+            ? 'Enable hardware acceleration (Chrome: Settings → System) or check the graphics driver, then reload. On a Meta Quest headset this works out of the box.'
+            : '';
         $('enter-sub').textContent = 'Unavailable';
         $('overlay').dataset.state = 'error';
     }

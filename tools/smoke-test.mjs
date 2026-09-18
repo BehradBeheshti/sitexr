@@ -78,6 +78,17 @@ const runViewport = async (label, viewport, { mockVr = false } = {}) => {
     });
     page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
     page.on('requestfailed', (r) => errors.push(`requestfailed: ${r.url()} ${r.failure()?.errorText}`));
+    page.on('response', (r) => {
+        if (r.status() >= 400) errors.push(`http ${r.status()}: ${r.url()}`);
+    });
+    // each viewport starts from a clean slate: default site, tutorial unseen
+    await page.evaluateOnNewDocument(() => {
+        try {
+            localStorage.clear();
+        } catch {
+            // storage unavailable
+        }
+    });
     if (mockVr) {
         await page.evaluateOnNewDocument(() => {
             // Pretend to be a headset browser for the gating check only. No session can start.
@@ -186,6 +197,37 @@ const runViewport = async (label, viewport, { mockVr = false } = {}) => {
             qa.markers.closeCard();
             qa.settings.set('tutorialDone', false);
         });
+    }
+
+    // switch to every other site from the picker: each must load and enter the walkthrough
+    if (!mockVr && loaded && !process.argv.includes('--first-site-only')) {
+        const ids = await page.evaluate(() => [...document.querySelectorAll('#sites .site')].map((b) => b.dataset.id));
+        for (const id of ids.slice(1)) {
+            await page.evaluate(() => document.getElementById('hud-site').click());
+            await page.click(`#sites .site[data-id="${id}"]`);
+            let ok = false;
+            try {
+                await page.waitForFunction(() => !document.getElementById('enter')?.disabled, { timeout: 240000 });
+                ok = true;
+            } catch {
+                ok = false;
+            }
+            check(`${label}: site "${id}" loads`, ok);
+            if (!ok) continue;
+            await page.screenshot({ path: join(outDir, `${label}-site-${id}-welcome.png`) });
+            await page.click('#enter');
+            await new Promise((r) => setTimeout(r, 4000));
+            const st = await page.evaluate(() => ({ hud: !document.getElementById('hud').hidden, name: document.getElementById('hud-site-name').textContent }));
+            check(`${label}: site "${id}" walkthrough entered`, st.hud, st.name);
+            await page.screenshot({ path: join(outDir, `${label}-site-${id}-walk.png`) });
+            await page.evaluate(() => document.getElementById('hud-tour').click());
+            await new Promise((r) => setTimeout(r, 1500));
+            await page.screenshot({ path: join(outDir, `${label}-site-${id}-tour.png`) });
+            await page.evaluate(() => { const qa = window.__sitexr; qa.tour.next(); });
+            await new Promise((r) => setTimeout(r, 1500));
+            await page.screenshot({ path: join(outDir, `${label}-site-${id}-tour2.png`) });
+            await page.evaluate(() => document.getElementById('caption-stop').click());
+        }
     }
 
     const benign = (e) => /favicon|WebGPU|GPU stall|Automatic fallback|swiftshader|GroupMarkerNotSet|ERR_BLOCKED_BY_CLIENT/i.test(e);

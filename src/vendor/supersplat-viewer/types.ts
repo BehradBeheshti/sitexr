@@ -19,8 +19,8 @@ type InputMode = 'desktop' | 'touch';
 // the createViewer options with every default applied: what the viewer reads at runtime, and
 // immutable once it starts. The flags are documented on ViewerFlags
 type Config = ViewerAssets &
-    Required<Omit<ViewerFlags, 'hpr' | 'budget' | 'lang' | 'controllerProfilesUrl' | 'floorHeightAt'>> &
-    Pick<ViewerFlags, 'hpr' | 'budget' | 'lang' | 'controllerProfilesUrl' | 'floorHeightAt'> & {
+    Required<Omit<ViewerFlags, 'hpr' | 'budget' | 'lang' | 'controllerProfilesUrl' | 'floorHeightAt' | 'worldScale' | 'collision'>> &
+    Pick<ViewerFlags, 'hpr' | 'budget' | 'lang' | 'controllerProfilesUrl' | 'floorHeightAt' | 'worldScale' | 'collision'> & {
         poster?: HTMLImageElement;
         contents: Promise<Response>;
     };

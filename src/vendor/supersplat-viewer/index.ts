@@ -56,6 +56,10 @@ const loadGsplat = async (
             // which is another viewer's when two share a page
             const entity = new Entity('gsplat', app);
             entity.setLocalEulerAngles(0, 0, 180);
+            // SITEXR: bring non-metric captures to life size
+            if (config.worldScale && config.worldScale !== 1) {
+                entity.setLocalScale(config.worldScale, config.worldScale, config.worldScale);
+            }
             entity.addComponent('gsplat', {
                 unified: true,
                 asset
@@ -275,7 +279,9 @@ const resolveConfig = (options: CreateViewerOptions): Config => ({
     lang: options.lang,
     exposeGlobals: options.exposeGlobals ?? false,
     controllerProfilesUrl: options.controllerProfilesUrl, // SITEXR
-    floorHeightAt: options.floorHeightAt // SITEXR
+    floorHeightAt: options.floorHeightAt, // SITEXR
+    worldScale: options.worldScale, // SITEXR
+    collision: options.collision // SITEXR
 });
 
 const createViewer = async (options: CreateViewerOptions): Promise<ViewerHandle> => {
@@ -406,7 +412,13 @@ const createViewer = async (options: CreateViewerOptions): Promise<ViewerHandle>
 
     // Load collision data (type determined by file extension)
     let collisionLoad: Promise<Collision> | undefined;
-    if (config.collisionUrl) {
+    if (config.collision) {
+        // SITEXR: host-provided collision (navigation grid)
+        collisionLoad = (config.collision as Promise<Collision | null>).catch((err: Error): null => {
+            console.warn('Failed to load collision:', err);
+            return null;
+        });
+    } else if (config.collisionUrl) {
         const ext = new URL(config.collisionUrl, location.href).pathname.split('.').pop()?.toLowerCase();
         if (ext === 'glb') {
             collisionLoad = MeshCollision.fromGlb(app, config.collisionUrl).catch((err: Error): null => {

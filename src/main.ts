@@ -1,13 +1,14 @@
-// SiteXR — Immersive Construction Review. Bootstraps the splat viewer, decides between
-// immersive VR and the desktop walkthrough, and wires the SiteXR layer on top.
+// SiteXR — Immersive Construction Review. Bootstraps the splat viewer for the chosen site,
+// decides between immersive VR and the desktop walkthrough, and wires the SiteXR layer.
 import { Vec3, platform } from 'playcanvas';
 
-import { ASSETS, EYE_HEIGHT, POIS, SPAWN, TOUR, VIEWER_SETTINGS } from './config';
-import type { Poi, TourStop } from './config';
+import { ASSETS, DEFAULT_SITE, EYE_HEIGHT, SITES, viewerSettings } from './config';
+import type { Poi, Site, TourStop } from './config';
 import { BUDGETS, settings } from './settings';
 import { Screens } from './ui/screens';
 import { createViewer } from './vendor/supersplat-viewer/index';
 import type { Collision } from './vendor/supersplat-viewer/collision';
+import { GridCollision } from './xr/grid-collision';
 import { Markers } from './xr/markers';
 import { VrMenu } from './xr/menu';
 import { getUiLayer } from './xr/panel';
@@ -32,251 +33,84 @@ const budgetFor = () => {
     return isHeadset() ? tier.headset : tier.desktop;
 };
 
+const SITE_KEY = 'sitexr.site';
+
+type Session = {
+    site: Site;
+    enterVr: () => Promise<void>;
+    enterDesktop: () => void;
+    dispose: () => void;
+};
+
 const main = async () => {
     const vrSupported = await detectVr();
-    let collision: Collision | null = null;
+    let session: Session | null = null;
+    let starting: Promise<Session> | null = null;
+
+    let stored: string | null = null;
+    try {
+        stored = localStorage.getItem(SITE_KEY);
+    } catch {
+        stored = null;
+    }
+    let selected = SITES.find((s) => s.id === stored) ?? SITES.find((s) => s.id === DEFAULT_SITE) ?? SITES[0];
 
     const screens = new Screens({
+        sites: SITES,
+        selected: selected.id,
+        onSelectSite: (id) => selectSite(id),
         onEnter: () => enter(),
-        onTour: () => tour.toggle(),
-        onTourNext: () => tour.next(),
-        onTourPrev: () => tour.prev(),
-        onTourStop: () => tour.stop(),
-        onReset: () => resetDesktop(),
-        onPoiGo: (poi) => desktopGoTo(poi.stand.x, poi.stand.z, poi.stand.look)
-    });
-    screens.setProgress(2, 'Connecting to site data…');
-
-    const viewer = await createViewer({
-        container: document.getElementById('viewer'),
-        settings: VIEWER_SETTINGS,
-        contentUrl: ASSETS.contentUrl,
-        collisionUrl: ASSETS.collisionUrl,
-        posterUrl: undefined,
-        ui: false,
-        nofx: true,
-        // WebGL everywhere: WebXR requires it, and it avoids partial WebGPU implementations
-        // (some Linux/Chrome GPU stacks reject small buffers and canvas uploads).
-        renderer: 'webgl',
-        budget: budgetFor(),
-        controllerProfilesUrl: ASSETS.controllerProfilesUrl,
-        floorHeightAt: (x, y, z) => (collision ? (collision.queryRay(x, y, z, 0, -1, 0, 40)?.y ?? null) : null)
+        onTour: () => sessionTour()?.toggle(),
+        onTourNext: () => sessionTour()?.next(),
+        onTourPrev: () => sessionTour()?.prev(),
+        onTourStop: () => sessionTour()?.stop(),
+        onReset: () => sessionApi()?.resetDesktop(),
+        onPoiGo: (poi) => sessionApi()?.desktopGoTo(poi.stand.x, poi.stand.z, poi.stand.look),
+        onChangeSite: () => screens.showWelcome()
     });
 
-    const { app, state, events, internals } = viewer;
-    const { camera } = internals;
+    // per-session API reachable from the screens callbacks
+    type Api = { tour: Tour; resetDesktop: () => void; desktopGoTo: (x: number, z: number, look: [number, number, number]) => void };
+    let api: Api | null = null;
+    const sessionTour = () => api?.tour ?? null;
+    const sessionApi = () => api;
 
-    // loading progress: download first, then streaming reveal
-    events.on('progress:changed', (p: number) => {
-        if (!state.loaded) screens.setProgress(5 + p * 0.9, p < 100 ? 'Streaming site capture…' : 'Building the site…');
-    });
-
-    collision = await internals.collision;
-    if (!collision) {
-        console.warn('SiteXR: collision data missing, terrain following disabled');
-    }
-
-    // ---- SiteXR layer --------------------------------------------------------------------
-    const layer = getUiLayer(app, camera);
-    const rig = new XrRig(app, camera, collision, layer);
-
-    let desktopMode = false;
-    let vrPresenter: TourPresenter;
-    let desktopPresenter: TourPresenter;
-
-    const tour = new Tour(TOUR, { travel: async () => {}, caption: () => {}, end: () => {} }, () => {
-        screens.setTourActive(tour.active);
-    });
-
-    const markers = new Markers(rig, POIS, {
-        onDesktopSelect: (poi: Poi) => screens.showPoi(poi),
-        onGoThere: (poi: Poi) => {
-            const s = rig.findStand(poi.stand.x, poi.stand.z);
-            rig.blinkTo(s.x, s.y, s.z, poi.stand.look);
+    const selectSite = async (id: string) => {
+        const site = SITES.find((s) => s.id === id);
+        if (!site || site.id === selected.id) return;
+        selected = site;
+        try {
+            localStorage.setItem(SITE_KEY, id);
+        } catch {
+            // ignore
         }
-    });
-
-    const tutorial = new Tutorial(rig, () => {
-        if (rig.active) screensToastVr('Tutorial complete. Press B for the menu.');
-    });
-
-    const menu = new VrMenu(rig, {
-        tourActive: () => tour.active,
-        toggleTour: () => tour.toggle(),
-        replayTutorial: () => tutorial.start()
-    });
-
-    // in-VR tour caption panel
-    const captionPanel = new Panel(app, layer, { name: 'tour-caption', width: 1.0, height: 0.3, pixels: 1024, overlay: true });
-    const drawCaption = (stop: TourStop, i: number, n: number) => {
-        captionPanel.draw((ctx, w, h) => {
-            drawPanelBackground(ctx, w, h);
-            ctx.textAlign = 'left';
-            ctx.textBaseline = 'alphabetic';
-            ctx.fillStyle = THEME.accent;
-            ctx.font = `700 22px ${THEME.font}`;
-            ctx.fillText(`GUIDED TOUR · STOP ${i + 1} OF ${n}`, 40, 52);
-            ctx.fillStyle = THEME.text;
-            ctx.font = `700 40px ${THEME.font}`;
-            ctx.fillText(stop.title, 40, 104);
-            ctx.fillStyle = THEME.muted;
-            ctx.font = `400 27px ${THEME.font}`;
-            wrapText(ctx, stop.text, 40, 150, w - 80, 36);
-            ctx.fillStyle = THEME.muted;
-            ctx.font = `400 21px ${THEME.font}`;
-            ctx.textAlign = 'right';
-            ctx.fillText('A: next stop · X: end tour', w - 40, h - 26);
-        });
-    };
-    let captionTimer = 0;
-
-    vrPresenter = {
-        travel: async (stop) => {
-            const s = rig.findStand(stop.x, stop.z);
-            await rig.blinkTo(s.x, s.y, s.z, stop.look);
-        },
-        caption: (stop, i, n) => {
-            drawCaption(stop, i, n);
-            captionPanel.placeInFront(camera, 1.6, -0.42);
-            captionPanel.show();
-            captionTimer = 6;
-        },
-        end: () => captionPanel.hide()
+        screens.setSelected(id);
+        await startSelected();
     };
 
-    desktopPresenter = {
-        travel: async (stop) => {
-            await screens.fadeOut();
-            desktopGoTo(stop.x, stop.z, stop.look);
-            await new Promise((r) => setTimeout(r, 120));
-            screens.fadeIn();
-        },
-        caption: (stop, i, n) => screens.showCaption(stop, i, n),
-        end: () => screens.hideCaption()
+    const startSelected = async () => {
+        if (starting) await starting.catch((): null => null);
+        session?.dispose();
+        session = null;
+        api = null;
+        screens.setLoading(selected);
+        starting = startSite(selected);
+        try {
+            session = await starting;
+        } catch (err) {
+            console.error('SiteXR failed to start the site', err);
+            screens.setLoadError(errorText(err));
+        } finally {
+            starting = null;
+        }
     };
 
-    // a small notice panel for VR (used after the tutorial and on tour end)
-    const noticePanel = new Panel(app, layer, { name: 'notice', width: 0.7, height: 0.14, pixels: 768, overlay: true });
-    let noticeTimer = 0;
-    const screensToastVr = (text: string) => {
-        noticePanel.draw((ctx, w, h) => {
-            drawPanelBackground(ctx, w, h);
-            ctx.fillStyle = THEME.text;
-            ctx.font = `600 34px ${THEME.font}`;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(text, w / 2, h / 2);
-        });
-        noticePanel.placeInFront(camera, 1.4, -0.3);
-        noticePanel.show();
-        noticeTimer = 3;
-    };
-
-    app.on('update', (dt: number) => {
-        tour.update(dt);
-        if (captionTimer > 0) {
-            captionTimer -= dt;
-            if (captionTimer <= 0) captionPanel.hide();
-        }
-        if (noticeTimer > 0) {
-            noticeTimer -= dt;
-            if (noticeTimer <= 0) noticePanel.hide();
-        }
-    });
-
-    // ---- desktop walkthrough helpers --------------------------------------------------------
-    const desktopGoTo = (x: number, z: number, look: [number, number, number]) => {
-        const cm = internals.cameraManager();
-        if (!cm) return;
-        const s = rig.findStand(x, z);
-        state.cameraMode = 'walk';
-        cm.camera.look(new Vec3(s.x, s.y + EYE_HEIGHT, s.z), new Vec3(look[0], look[1], look[2]));
-        cm.snap();
-    };
-    const resetDesktop = () => {
-        if (rig.active) return;
-        desktopGoTo(SPAWN.x, SPAWN.z, SPAWN.look);
-        screens.toast('Position reset');
-    };
-
-    // ---- VR session lifecycle -------------------------------------------------------------------
-    rig.events.on('ready', () => {
-        markers.setVisible(true);
-        if (!settings.get().tutorialDone) tutorial.start();
-    });
-    rig.events.on('button', (hand: string, name: string) => {
-        if (menu.isOpen && name === 'secondary') {
-            menu.close();
-            return;
-        }
-        if (name === 'secondary' && hand === 'right') {
-            // B: menu
-            if (markers.cardOpen) markers.closeCard();
-            else menu.toggle();
-        } else if (name === 'secondary' && hand === 'left') {
-            // Y: reset position
-            if (!menu.isOpen) rig.resetToSpawn();
-        } else if (name === 'primary' && hand === 'left') {
-            // X: guided tour
-            if (!menu.isOpen) tour.toggle();
-        } else if (name === 'primary' && hand === 'right') {
-            // A while the tour runs and not pointing at UI: next stop
-            if (tour.active && !rig.pointingAtUi && !menu.isOpen) tour.next();
-        }
-    });
-    rig.events.on('session:start', () => {
-        tour.setPresenter(vrPresenter);
-        tour.stop();
-        screens.hideHud();
-        app.scene.gsplat.splatBudget = budgetFor() * 1e6;
-    });
-    rig.events.on('session:end', () => {
-        tour.stop();
-        menu.close();
-        markers.closeCard();
-        if (tutorial.active) tutorial.finish();
-        captionPanel.hide();
-        noticePanel.hide();
-        tour.setPresenter(desktopPresenter);
-        screens.setEnterBusy(false);
-        screens.setReady(true);
-        screens.showWelcome('Session ended. Enter again to return to the site.');
-        desktopMode = false;
-        app.renderNextFrame = true;
-    });
-    tour.setPresenter(desktopPresenter);
-
-    settings.events.on('change:quality', () => {
-        app.scene.gsplat.splatBudget = budgetFor() * 1e6;
-        app.renderNextFrame = true;
-    });
-
-    // ---- keyboard shortcuts (desktop) --------------------------------------------------------
-    window.addEventListener('keydown', (e) => {
-        if (rig.active || !desktopMode || screens.modalOpen) return;
-        if (e.target instanceof HTMLInputElement) return;
-        switch (e.key.toLowerCase()) {
-            case 'r':
-                resetDesktop();
-                break;
-            case 't':
-                tour.toggle();
-                break;
-            case 'm':
-                screens.openModal('modal-settings');
-                break;
-            case 'n':
-                if (tour.active) tour.next();
-                break;
-        }
-    });
-
-    // ---- enter --------------------------------------------------------------------------------------
     const enter = async () => {
+        if (!session) return;
         if (vrSupported) {
             screens.setEnterBusy(true);
             try {
-                await rig.enterVr();
+                await session.enterVr();
                 screens.hideWelcome();
             } catch (err) {
                 console.error('SiteXR: could not start the VR session', err);
@@ -286,53 +120,290 @@ const main = async () => {
             }
             return;
         }
-        desktopMode = true;
-        screens.hideWelcome();
-        screens.showHud();
-        state.cameraMode = 'walk';
-        state.inputEnabled = true;
-        markers.setVisible(true);
-        app.renderNextFrame = true;
+        session.enterDesktop();
     };
 
-    // ---- ready --------------------------------------------------------------------------------------
-    const onLoaded = () => {
-        state.cameraMode = 'walk';
-        markers.setVisible(true);
-        screens.setReady(vrSupported);
-        app.renderNextFrame = true;
+    // ---- one site ----------------------------------------------------------------------------------
+    const startSite = async (site: Site): Promise<Session> => {
+        const container = document.getElementById('viewer');
+        container.innerHTML = '';
+        screens.setProgress(2, 'Connecting to site data…');
+
+        const collisionPromise: Promise<Collision | null> | undefined =
+            site.collision.type === 'grid' ? GridCollision.load(site.collision.url) : undefined;
+        let collision: Collision | null = null;
+
+        const viewer = await createViewer({
+            container,
+            settings: viewerSettings(site),
+            contentUrl: site.contentUrl,
+            collisionUrl: site.collision.type === 'voxel' ? site.collision.url : undefined,
+            collision: collisionPromise,
+            worldScale: site.worldScale,
+            ui: false,
+            nofx: true,
+            // WebGL everywhere: WebXR requires it, and it avoids partial WebGPU implementations
+            renderer: 'webgl',
+            budget: budgetFor(),
+            controllerProfilesUrl: ASSETS.controllerProfilesUrl,
+            floorHeightAt: (x, y, z) => (collision ? (collision.queryRay(x, y, z, 0, -1, 0, 60)?.y ?? null) : null)
+        });
+
+        const { app, state, events, internals } = viewer;
+        const { camera } = internals;
+        let disposed = false;
+
+        events.on('progress:changed', (p: number) => {
+            if (!state.loaded) screens.setProgress(5 + p * 0.9, p < 100 ? 'Streaming site capture…' : 'Building the site…');
+        });
+
+        collision = await internals.collision;
+        if (!collision) console.warn('SiteXR: collision data missing, terrain following disabled');
+
+        const layer = getUiLayer(app, camera);
+        const rig = new XrRig(app, camera, collision, layer, { spawn: site.spawn, walkRadius: site.walkRadius });
+
+        const tour = new Tour(site.tour, { travel: async () => {}, caption: () => {}, end: () => {} }, () => {
+            screens.setTourActive(tour.active);
+        });
+
+        const markers = new Markers(rig, site.pois, {
+            onDesktopSelect: (poi: Poi) => screens.showPoi(poi),
+            onGoThere: (poi: Poi) => {
+                const s = rig.findStand(poi.stand.x, poi.stand.z);
+                rig.blinkTo(s.x, s.y, s.z, poi.stand.look);
+            }
+        });
+
+        const tutorial = new Tutorial(rig, () => {
+            if (rig.active) toastVr('Tutorial complete. Press B for the menu.');
+        });
+
+        const menu = new VrMenu(rig, {
+            tourActive: () => tour.active,
+            toggleTour: () => tour.toggle(),
+            replayTutorial: () => tutorial.start(),
+            switchSite: () => {
+                rig.exitVr();
+            },
+            site
+        });
+
+        // in-VR tour caption panel
+        const captionPanel = new Panel(app, layer, { name: 'tour-caption', width: 1.0, height: 0.3, pixels: 1024, overlay: true });
+        const drawCaption = (stop: TourStop, i: number, n: number) => {
+            captionPanel.draw((ctx, w, h) => {
+                drawPanelBackground(ctx, w, h);
+                ctx.textAlign = 'left';
+                ctx.textBaseline = 'alphabetic';
+                ctx.fillStyle = THEME.accent;
+                ctx.font = `700 22px ${THEME.font}`;
+                ctx.fillText(`GUIDED TOUR · STOP ${i + 1} OF ${n}`, 40, 52);
+                ctx.fillStyle = THEME.text;
+                ctx.font = `700 40px ${THEME.font}`;
+                ctx.fillText(stop.title, 40, 104);
+                ctx.fillStyle = THEME.muted;
+                ctx.font = `400 27px ${THEME.font}`;
+                wrapText(ctx, stop.text, 40, 150, w - 80, 36);
+                ctx.fillStyle = THEME.muted;
+                ctx.font = `400 21px ${THEME.font}`;
+                ctx.textAlign = 'right';
+                ctx.fillText('A: next stop · X: end tour', w - 40, h - 26);
+            });
+        };
+        let captionTimer = 0;
+
+        const vrPresenter: TourPresenter = {
+            travel: async (stop) => {
+                const s = rig.findStand(stop.x, stop.z);
+                await rig.blinkTo(s.x, s.y, s.z, stop.look);
+            },
+            caption: (stop, i, n) => {
+                drawCaption(stop, i, n);
+                captionPanel.placeInFront(camera, 1.6, -0.42);
+                captionPanel.show();
+                captionTimer = 6;
+            },
+            end: () => captionPanel.hide()
+        };
+
+        const desktopGoTo = (x: number, z: number, look: [number, number, number]) => {
+            const cm = internals.cameraManager();
+            if (!cm) return;
+            const s = rig.findStand(x, z);
+            state.cameraMode = 'walk';
+            cm.camera.look(new Vec3(s.x, s.y + EYE_HEIGHT, s.z), new Vec3(look[0], look[1], look[2]));
+            cm.snap();
+        };
+        const resetDesktop = () => {
+            if (rig.active) return;
+            desktopGoTo(site.spawn.x, site.spawn.z, site.spawn.look);
+            screens.toast('Position reset');
+        };
+
+        const desktopPresenter: TourPresenter = {
+            travel: async (stop) => {
+                await screens.fadeOut();
+                desktopGoTo(stop.x, stop.z, stop.look);
+                await new Promise((r) => setTimeout(r, 120));
+                screens.fadeIn();
+            },
+            caption: (stop, i, n) => screens.showCaption(stop, i, n),
+            end: () => screens.hideCaption()
+        };
+        tour.setPresenter(desktopPresenter);
+
+        const noticePanel = new Panel(app, layer, { name: 'notice', width: 0.7, height: 0.14, pixels: 768, overlay: true });
+        let noticeTimer = 0;
+        const toastVr = (text: string) => {
+            noticePanel.draw((ctx, w, h) => {
+                drawPanelBackground(ctx, w, h);
+                ctx.fillStyle = THEME.text;
+                ctx.font = `600 34px ${THEME.font}`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(text, w / 2, h / 2);
+            });
+            noticePanel.placeInFront(camera, 1.4, -0.3);
+            noticePanel.show();
+            noticeTimer = 3;
+        };
+
+        app.on('update', (dt: number) => {
+            tour.update(dt);
+            if (captionTimer > 0) {
+                captionTimer -= dt;
+                if (captionTimer <= 0) captionPanel.hide();
+            }
+            if (noticeTimer > 0) {
+                noticeTimer -= dt;
+                if (noticeTimer <= 0) noticePanel.hide();
+            }
+        });
+
+        // ---- VR session lifecycle
+        rig.events.on('ready', () => {
+            markers.setVisible(true);
+            if (!settings.get().tutorialDone) tutorial.start();
+        });
+        rig.events.on('button', (hand: string, name: string) => {
+            if (menu.isOpen && name === 'secondary') {
+                menu.close();
+                return;
+            }
+            if (name === 'secondary' && hand === 'right') {
+                if (markers.cardOpen) markers.closeCard();
+                else menu.toggle();
+            } else if (name === 'secondary' && hand === 'left') {
+                if (!menu.isOpen) rig.resetToSpawn();
+            } else if (name === 'primary' && hand === 'left') {
+                if (!menu.isOpen) tour.toggle();
+            } else if (name === 'primary' && hand === 'right') {
+                if (tour.active && !rig.pointingAtUi && !menu.isOpen) tour.next();
+            }
+        });
+        rig.events.on('session:start', () => {
+            tour.setPresenter(vrPresenter);
+            tour.stop();
+            screens.hideHud();
+            app.scene.gsplat.splatBudget = budgetFor() * 1e6;
+        });
+        rig.events.on('session:end', () => {
+            tour.stop();
+            menu.close();
+            markers.closeCard();
+            if (tutorial.active) tutorial.finish();
+            captionPanel.hide();
+            noticePanel.hide();
+            tour.setPresenter(desktopPresenter);
+            if (disposed) return;
+            screens.setEnterBusy(false);
+            screens.setReady(true);
+            screens.showWelcome('Session ended. Enter again to return to the site, or choose another site.');
+            app.renderNextFrame = true;
+        });
+
+        const onQuality = () => {
+            app.scene.gsplat.splatBudget = budgetFor() * 1e6;
+            app.renderNextFrame = true;
+        };
+        settings.events.on('change:quality', onQuality);
+
+        let desktopMode = false;
+        const onKey = (e: KeyboardEvent) => {
+            if (rig.active || !desktopMode || screens.modalOpen || !screens.welcomeHidden) return;
+            if (e.target instanceof HTMLInputElement) return;
+            switch (e.key.toLowerCase()) {
+                case 'r':
+                    resetDesktop();
+                    break;
+                case 't':
+                    tour.toggle();
+                    break;
+                case 'm':
+                    screens.openModal('modal-settings');
+                    break;
+                case 'n':
+                    if (tour.active) tour.next();
+                    break;
+            }
+        };
+        window.addEventListener('keydown', onKey);
+
+        const onLoaded = () => {
+            if (disposed) return;
+            state.cameraMode = 'walk';
+            markers.setVisible(true);
+            screens.setReady(vrSupported);
+            app.renderNextFrame = true;
+        };
+        if (state.loaded) onLoaded();
+        else events.once('loaded:changed', onLoaded);
+
+        api = { tour, resetDesktop, desktopGoTo };
+
+        // Non-enumerable QA handle for the headless smoke test (not a user-facing control).
+        Object.defineProperty(window, '__sitexr', {
+            value: { viewer, rig, menu, tutorial, markers, tour, settings, pois: site.pois, site },
+            enumerable: false,
+            configurable: true
+        });
+
+        return {
+            site,
+            enterVr: () => rig.enterVr(),
+            enterDesktop: () => {
+                desktopMode = true;
+                screens.hideWelcome();
+                screens.showHud();
+                state.cameraMode = 'walk';
+                state.inputEnabled = true;
+                markers.setVisible(true);
+                app.renderNextFrame = true;
+            },
+            dispose: () => {
+                disposed = true;
+                window.removeEventListener('keydown', onKey);
+                settings.events.off('change:quality', onQuality);
+                rig.dispose();
+                menu.dispose();
+                tour.stop();
+                screens.hideHud();
+                viewer.destroy();
+            }
+        };
     };
-    if (state.loaded) onLoaded();
-    else events.once('loaded:changed', onLoaded);
 
-    // Non-enumerable QA handle for the headless smoke test (not a user-facing control).
-    Object.defineProperty(window, '__sitexr', {
-        value: { viewer, rig, menu, tutorial, markers, tour, settings, pois: POIS },
-        enumerable: false,
-        configurable: true
-    });
+    await startSelected();
+};
 
-    // keep the desktop walkthrough responsive to modal state
-    settings.events.on('change', () => {
-        app.renderNextFrame = true;
-    });
+const errorText = (err: unknown) => {
+    const noGraphics = /webgl|graphics device|context/i.test(String((err as Error)?.message ?? err));
+    return noGraphics ? 'no-graphics' : 'generic';
 };
 
 main().catch((err) => {
     console.error('SiteXR failed to start', err);
     const label = document.getElementById('progress-label');
-    const note = document.getElementById('mode-note');
-    const noGraphics = /webgl|graphics device|context/i.test(String(err?.message ?? err));
-    if (label) {
-        label.textContent = noGraphics
-            ? '3D graphics are unavailable in this browser.'
-            : 'The site could not be loaded. Please refresh to try again.';
-    }
-    if (note && noGraphics) {
-        note.textContent =
-            'Enable hardware acceleration (Chrome: Settings → System) or check the graphics driver, then reload. On a Meta Quest headset this works out of the box.';
-    }
-    const sub = document.getElementById('enter-sub');
-    if (sub) sub.textContent = 'Unavailable';
-    document.getElementById('overlay')?.setAttribute('data-state', 'error');
+    if (label) label.textContent = 'The site could not be loaded. Please refresh to try again.';
 });

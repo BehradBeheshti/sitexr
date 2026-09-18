@@ -23,9 +23,10 @@
         </header>
 
         <div class="card" role="dialog" aria-labelledby="site-title">
-            <p class="eyebrow">Site capture · Reality model</p>
+            <div class="sites" id="sites" role="group" aria-label="Choose a site"></div>
+            <p class="eyebrow" id="site-eyebrow">Site capture · Reality model</p>
             <h1 id="site-title">Muddy Excavator Site</h1>
-            <p class="lede">Walk the excavation at true scale, inspect the tracked excavator and review ground and access conditions.</p>
+            <p class="lede" id="site-lede">Walk the excavation at true scale, inspect the tracked excavator and review ground and access conditions.</p>
 
             <div class="progress" id="progress" aria-live="polite">
                 <div class="bar"><span id="progress-fill"></span></div>
@@ -49,8 +50,9 @@
     <!-- Desktop walkthrough HUD (hidden in VR; the headset shows the in-VR menu instead) -->
     <section id="hud" class="hud" hidden>
         <div class="hud-top">
-            <span class="hud-brand">SiteXR</span>
+            <span class="hud-brand">SiteXR <span class="hud-site" id="hud-site-name"></span></span>
             <div class="hud-actions">
+                <button id="hud-site" class="hud-btn">Change site</button>
                 <button id="hud-tour" class="hud-btn">Guided tour</button>
                 <button id="hud-reset" class="hud-btn">Reset position</button>
                 <button id="hud-menu" class="hud-btn">Menu</button>
@@ -91,7 +93,8 @@
     <div id="modal-credits" class="modal" hidden>
         <div class="modal-card">
             <h2>Credits</h2>
-            <p><strong>Scene</strong><br />“Muddy Excavator Site” by dok11 — licensed <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>. Source: <a href="https://superspl.at/scene/ded12920" target="_blank" rel="noopener">original scene</a>.<br /><span class="muted">Changes: converted to a multi-level-of-detail streaming format, spherical harmonics reduced to one band, voxel collision data used for navigation.</span></p>
+            <p><strong>Current site</strong><br /><span id="credit-scene"></span></p>
+            <p><strong>All sites</strong><br />“Muddy Excavator Site” by dok11 · “こまつの杜 (Komatsu no Mori)” by gnehs · “Construction next day” by redmancg — each licensed <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>, adapted for streaming and navigation.</p>
             <p><strong>Technology</strong><br />Rendered with the <a href="https://playcanvas.com" target="_blank" rel="noopener">PlayCanvas engine</a> and the open-source SuperSplat viewer runtime (MIT). Controller models from the WebXR Input Profiles project (Apache-2.0).</p>
             <p><strong>Controls</strong><br />VR: left stick walk · right stick turn · trigger teleport · B menu · Y reset · X tour · A/trigger select.<br />Desktop: drag to look · click the ground to walk · W A S D · R reset · T tour · M menu.</p>
             <div class="modal-actions"><button class="hud-btn primary" data-close>Close</button></div>

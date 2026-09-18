@@ -12,7 +12,7 @@ import { Color, Entity, EventHandler, Vec3, math } from 'playcanvas';
 import type { AppBase, Layer, StandardMaterial, XrInputSource } from 'playcanvas';
 import { XrNavigation } from 'playcanvas/scripts/esm/xr/xr-navigation.mjs';
 
-import { SPAWN, WALK_RADIUS } from '../config';
+
 import { FRAMEBUFFER_SCALE, SPEEDS, settings } from '../settings';
 import type { Collision } from '../vendor/supersplat-viewer/collision';
 import { findCylinderSpawn } from '../vendor/supersplat-viewer/collision/find-spawn';
@@ -105,8 +105,24 @@ export class XrRig {
 
     private cursorMat: StandardMaterial;
 
-    constructor(app: AppBase, camera: Entity, collision: Collision | null, layer: Layer) {
+    /** Arrival point and look target (world metres). */
+    spawn: { x: number; z: number; look: [number, number, number] };
+
+    /** Visitors are kept within this radius of the scene origin. */
+    walkRadius: number;
+
+    private onSettings: () => void;
+
+    constructor(
+        app: AppBase,
+        camera: Entity,
+        collision: Collision | null,
+        layer: Layer,
+        opts: { spawn: { x: number; z: number; look: [number, number, number] }; walkRadius: number }
+    ) {
         this.app = app;
+        this.spawn = opts.spawn;
+        this.walkRadius = opts.walkRadius;
         this.camera = camera;
         this.rig = camera.parent as Entity;
         this.collision = collision;
@@ -126,7 +142,8 @@ export class XrRig {
             this.blinkTo(point.x, point.y, point.z).then(() => this.events.fire('teleport', point));
         };
         this.applyComfort();
-        settings.events.on('change', () => this.applyComfort());
+        this.onSettings = () => this.applyComfort();
+        settings.events.on('change', this.onSettings);
 
         // fade + vignette quads ride on the camera
         this.fadePanel = new Panel(app, layer, { name: 'xr-fade', width: 3, height: 3, pixels: 8, overlay: true });
@@ -229,6 +246,15 @@ export class XrRig {
 
     /** Nearest standable floor point to (x, z): what the tour and "Go there" use. */
     findStand(x: number, z: number, hintY?: number): Vec3 {
+        // A navigation grid answers this directly and exactly; the voxel lattice search is
+        // the fallback for scenes that ship voxel collision data.
+        const grid = this.collision as unknown as {
+            nearestStand?: (x: number, z: number) => { x: number; y: number; z: number } | null;
+        };
+        if (grid?.nearestStand) {
+            const hit = grid.nearestStand(x, z);
+            if (hit) return new Vec3(hit.x, hit.y, hit.z);
+        }
         const g = hintY ?? this.groundAt(x, z) ?? 0;
         const out = { x, y: g, z };
         if (this.collision && findCylinderSpawn(this.collision, x, g + 0.9, z, 0.95, 0.25, out)) {
@@ -265,7 +291,7 @@ export class XrRig {
         if (!hit) return null;
         const point = new Vec3(hit.x, hit.y, hit.z);
         // Standable: within the site, not a wall/steep bank, with headroom for a person
-        const inSite = Math.hypot(point.x, point.z) <= WALK_RADIUS;
+        const inSite = Math.hypot(point.x, point.z) <= this.walkRadius;
         const n = this.collision.querySurfaceNormal(point.x, point.y, point.z, tmpV1.x, tmpV1.y, tmpV1.z);
         const walkable = n.ny >= 0.6;
         const headroom = !this.collision.queryRay(point.x, point.y + 0.3, point.z, 0, 1, 0, 1.6);
@@ -318,10 +344,16 @@ export class XrRig {
     }
 
     resetToSpawn(blink = true): Promise<void> {
-        const stand = this.findStand(SPAWN.x, SPAWN.z);
-        if (blink) return this.blinkTo(stand.x, stand.y, stand.z, SPAWN.look);
-        this.placeHead(stand.x, stand.y, stand.z, SPAWN.look);
+        const stand = this.findStand(this.spawn.x, this.spawn.z);
+        if (blink) return this.blinkTo(stand.x, stand.y, stand.z, this.spawn.look);
+        this.placeHead(stand.x, stand.y, stand.z, this.spawn.look);
         return Promise.resolve();
+    }
+
+    /** Detach from shared stores; the engine app owns everything else. */
+    dispose() {
+        settings.events.off('change', this.onSettings);
+        this.exitVr();
     }
 
     fade(target: number, speed = 6): Promise<void> {
@@ -533,7 +565,7 @@ export class XrRig {
         const settling = this.settleFrames > 0;
         if (settling) this.settleFrames--;
 
-        const inSite = Math.hypot(hx, hz) <= WALK_RADIUS;
+        const inSite = Math.hypot(hx, hz) <= this.walkRadius;
         const step = ground !== null && this.lastGround !== null ? ground - this.lastGround : 0;
         const ok = ground !== null && inSite && (settling || step < 0.55);
 
