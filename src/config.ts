@@ -14,6 +14,24 @@ export const ASSETS = {
     controllerProfilesUrl: 'controllers'
 };
 
+/**
+ * Where scene assets are served from. Empty by default, meaning they sit beside the app.
+ *
+ * Set `VITE_ASSET_BASE` at build time to serve them from somewhere else — a private
+ * bucket, for instance — so a licensed or client-owned model never has to live in the
+ * repository. Only the splat, collision and model urls are redirected; the app's own
+ * images stay local. A site url that is already absolute is left alone.
+ *
+ *   VITE_ASSET_BASE=https://assets.example.com/sitexr npm run build
+ *
+ * The bucket must allow cross-origin reads from the site's origin.
+ */
+const ASSET_BASE = ((import.meta.env.VITE_ASSET_BASE as string | undefined) ?? '').replace(/\/$/, '');
+
+/** Resolve a site asset path against {@link ASSET_BASE}. */
+export const assetUrl = (path: string) =>
+    !ASSET_BASE || /^(https?:)?\/\//.test(path) || path.startsWith('data:') ? path : `${ASSET_BASE}/${path}`;
+
 /** Standing eye height used for the desktop (non-VR) walkthrough camera. */
 export const EYE_HEIGHT = 1.65;
 
@@ -47,8 +65,39 @@ export type Credits = {
     changes: string;
 };
 
+/** The two ways into the app: a captured site, or a model of one not built yet. */
+export type ModeId = 'capture' | 'design';
+
+export type Mode = {
+    id: ModeId;
+    name: string;
+    tagline: string;
+    blurb: string;
+    /** Who the experience is for, in one phrase. */
+    audience: string;
+};
+
+export const MODES: Mode[] = [
+    {
+        id: 'capture',
+        name: 'Captured Sites',
+        tagline: 'Reality capture · Gaussian splats',
+        blurb: 'Walk real sites recorded as 3D scans: earthworks, heavy plant and a floor under construction, at the scale and condition they were captured in.',
+        audience: 'for site teams reviewing what is actually there'
+    },
+    {
+        id: 'design',
+        name: 'Design Models',
+        tagline: 'BIM · Revit and IFC models',
+        blurb: 'Walk a building information model at full size, the way it would be reviewed before anything is built.',
+        audience: 'for design and BIM teams reviewing what is drawn'
+    }
+];
+
 export type Site = {
     id: string;
+    /** Which of the two experiences this site belongs to. */
+    kind: ModeId;
     name: string;
     subtitle: string;
     /** One sentence on the welcome card. */
@@ -78,6 +127,7 @@ export const TECH_CREDIT =
 
 const excavator: Site = {
     id: 'excavator',
+    kind: 'capture',
     name: 'Muddy Excavator Site',
     subtitle: 'Earthworks · tracked excavator · access review',
     blurb: 'Walk the excavation at true scale, inspect the tracked excavator and review ground and access conditions.',
@@ -137,6 +187,7 @@ const excavator: Site = {
 // 2.0 and 2.2 units tall, which is a 7.4 m haul truck and an 8 m mining excavator.
 const komatsu: Site = {
     id: 'komatsu',
+    kind: 'capture',
     name: 'Heavy Plant Yard',
     subtitle: 'Mining haul truck · hydraulic excavator · display yard',
     blurb: 'Stand beside a 290-tonne haul truck and a mining excavator at their real size, and see what heavy plant looks like from the ground.',
@@ -196,6 +247,7 @@ const komatsu: Site = {
 // 5.7 units (a 4.3 m floor) and the shoring towers sit on a 3.1 unit (2.3 m) grid.
 const scaffold: Site = {
     id: 'scaffold',
+    kind: 'capture',
     name: 'Formwork & Scaffold Floor',
     subtitle: 'Interior · slab formwork · shoring towers',
     blurb: 'Walk a floor under construction between shoring towers and check bracing, prop heads and the access lane.',
@@ -250,8 +302,72 @@ const scaffold: Site = {
     }
 };
 
-export const SITES: Site[] = [excavator, komatsu, scaffold];
+// A design model rather than a capture: a Revit office interior exported to FBX and
+// converted to glTF. The mesh is its own collision surface, so the walls stop you and the
+// slab carries you, which is what walking a model is for.
+const officeInterior: Site = {
+    id: 'office',
+    kind: 'design',
+    name: 'Office Furniture Layout',
+    subtitle: 'Revit model · FF&E layout at full size',
+    blurb: 'Walk an office furniture layout at full size: desks, chairs and clearances exactly where the model puts them.',
+    tag: 'Revit model',
+    poster: 'brand/poster-office.webp',
+    model: { url: 'bim/office-interior.glb' },
+    collision: { type: 'mesh', url: 'bim/office-interior.glb' },
+    worldScale: 1,
+    spawn: { x: 2.2, z: -2.2, floor: -0.69, look: [0, 0.2, 0.2] },
+    walkRadius: 12,
+    background: [0.72, 0.75, 0.79],
+    pois: [
+        {
+            id: 'desks',
+            index: 1,
+            title: 'Desk cluster',
+            text: 'Desks and task chairs where the model places them. Standing among them is the quickest way to judge whether the spacing works for the people who will use it.',
+            marker: [0, 0.9, 0.2],
+            stand: { x: 1.8, z: -1.2, look: [0, 0.3, 0.2] }
+        },
+        {
+            id: 'clearance',
+            index: 2,
+            title: 'Circulation clearance',
+            text: 'The gap between furniture runs. A gangway that reads as generous on a plan often does not once you are walking it at full size.',
+            marker: [-2.0, 0.9, 1.2],
+            stand: { x: -0.4, z: -0.8, look: [-2.0, 0.3, 1.2] }
+        },
+        {
+            id: 'display',
+            index: 3,
+            title: 'Wall-mounted display',
+            text: 'A screen at its modelled mounting height. Sight lines to a display are worth checking from the seats that will actually face it.',
+            marker: [-1.9, 3.15, 0.6],
+            stand: { x: 0.8, z: 0.4, look: [-1.9, 3.0, 0.6] }
+        }
+    ],
+    tour: [
+        { title: 'Arrival', text: 'A design model, not a capture: this is the furniture layout as drawn, at full size.', x: 2.2, z: -2.2, look: [0, 0.2, 0.2], dwell: 9 },
+        { title: 'Desk cluster', text: 'Desks and chairs where the model puts them. Judge the spacing by standing in it.', x: 1.8, z: -1.2, look: [0, 0.3, 0.2], dwell: 10 },
+        { title: 'Circulation', text: 'The gangway between furniture runs, at the width the model gives it.', x: -0.4, z: -0.8, look: [-2.0, 0.3, 1.2], dwell: 10 },
+        { title: 'Display', text: 'A wall-mounted screen at its modelled height. Check the sight line from the seats.', x: 0.8, z: 0.4, look: [-1.9, 3.0, 0.6], dwell: 9 },
+        { title: 'End of tour', text: 'Back at the arrival point. Explore the layout, or press B for the menu.', x: 2.2, z: -2.2, look: [0, 0.2, 0.2], dwell: 6 }
+    ],
+    credits: {
+        sceneTitle: 'Office furniture layout (Revit model)',
+        sceneAuthor: 'supplied by the project',
+        sceneLicense: 'not for redistribution',
+        sceneLicenseUrl: '',
+        sceneSourceUrl: '',
+        changes: 'Exported from Revit as FBX and converted to glTF: rescaled from inches to metres, node transforms baked in, meshes merged, materials made double-sided and a floor plane added. The export carried the furniture only, not the building shell.'
+    }
+};
+
+export const SITES: Site[] = [excavator, komatsu, scaffold, officeInterior];
 export const DEFAULT_SITE = excavator.id;
+
+export const sitesOf = (mode: ModeId) => SITES.filter((s) => s.kind === mode);
+export const modeOf = (siteId: string): ModeId => SITES.find((s) => s.id === siteId)?.kind ?? 'capture';
+export const defaultSiteOf = (mode: ModeId) => sitesOf(mode)[0];
 
 
 /** Viewer experience settings (schema v2) for a site. Post effects stay off for a matching XR/desktop look. */

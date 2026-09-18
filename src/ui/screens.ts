@@ -1,6 +1,7 @@
 // The DOM side of SiteXR: loading / welcome overlay, the desktop walkthrough HUD, the
 // settings and credits modals. Nothing here is visible inside an immersive session.
-import type { Poi, Site, TourStop } from '../config';
+import { MODES, sitesOf } from '../config';
+import type { ModeId, Poi, Site, TourStop } from '../config';
 import { settings } from '../settings';
 import type { Comfort } from '../settings';
 
@@ -9,6 +10,9 @@ const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getEleme
 export type ScreenCallbacks = {
     sites: Site[];
     selected: string;
+    /** The chosen experience, or null to show the chooser. */
+    mode: ModeId | null;
+    onSelectMode: (mode: ModeId) => void;
     onSelectSite: (id: string) => void;
     onChangeSite: () => void;
     onEnter: () => void;
@@ -27,11 +31,17 @@ export class Screens {
 
     private site: Site;
 
+    private mode: ModeId | null;
+
     constructor(cb: ScreenCallbacks) {
         this.cb = cb;
         this.site = cb.sites.find((s) => s.id === cb.selected) ?? cb.sites[0];
+        this.mode = cb.mode;
+        this.renderModes();
         this.renderSites();
+        this.applyMode();
         this.applySite();
+        $('change-mode').addEventListener('click', () => this.showModeChooser());
         $('hud-site').addEventListener('click', () => cb.onChangeSite());
         $('enter').addEventListener('click', () => cb.onEnter());
         $('open-settings').addEventListener('click', () => this.openModal('modal-settings'));
@@ -63,12 +73,60 @@ export class Screens {
         });
     }
 
+    // ---- experience chooser ---------------------------------------------------------------
+
+    private renderModes() {
+        const host = $('modes');
+        host.innerHTML = '';
+        for (const mode of MODES) {
+            const b = document.createElement('button');
+            b.className = 'mode';
+            b.type = 'button';
+            b.dataset.id = mode.id;
+            b.innerHTML = `<span class="mode-eyebrow">${mode.tagline}</span>
+                <span class="mode-name">${mode.name}</span>
+                <span class="mode-blurb">${mode.blurb}</span>
+                <span class="mode-audience">${mode.audience}</span>`;
+            b.addEventListener('click', () => this.cb.onSelectMode(mode.id));
+            host.appendChild(b);
+        }
+    }
+
+    /** Back to the two cards, without unloading whatever is already running. */
+    showModeChooser() {
+        this.mode = null;
+        this.applyMode();
+    }
+
+    setMode(mode: ModeId) {
+        this.mode = mode;
+        this.applyMode();
+    }
+
+    private applyMode() {
+        const chosen = this.mode !== null;
+        $('modes').hidden = chosen;
+        $('sites').hidden = !chosen;
+        $('mode-bar').hidden = !chosen;
+        $('site-eyebrow').hidden = !chosen;
+        $('site-title').hidden = !chosen;
+        $('site-lede').hidden = !chosen;
+        $('progress').hidden = !chosen;
+        $('enter').hidden = !chosen;
+        $('mode-note').hidden = !chosen;
+        if (chosen) {
+            $('mode-name').textContent = MODES.find((x) => x.id === this.mode)?.name ?? '';
+            this.renderSites();
+        }
+    }
+
     // ---- site picker -------------------------------------------------------------------------
 
     private renderSites() {
         const host = $('sites');
         host.innerHTML = '';
-        for (const site of this.cb.sites) {
+        const list = this.mode ? sitesOf(this.mode) : this.cb.sites;
+        for (const site of list) {
             const b = document.createElement('button');
             b.className = 'site';
             b.type = 'button';
@@ -95,7 +153,7 @@ export class Screens {
     private applySite() {
         const s = this.site;
         $('site-title').textContent = s.name;
-        $('site-eyebrow').textContent = `Site capture · ${s.subtitle}`;
+        $('site-eyebrow').textContent = `${s.kind === 'design' ? 'Design model' : 'Site capture'} · ${s.subtitle}`;
         $('site-lede').textContent = s.blurb;
         $('hud-site-name').textContent = s.name;
         const c = s.credits;
@@ -106,7 +164,10 @@ export class Screens {
 
     /** Back to the loading state for a newly selected site. */
     setLoading(site: Site) {
+        // The mode is not changed here: the app pre-loads a site so it is ready the moment
+        // someone picks a side, and that must not dismiss the chooser.
         this.site = site;
+        this.applyMode();
         this.applySite();
         const overlay = $('overlay');
         overlay.dataset.state = 'loading';

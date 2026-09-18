@@ -4,7 +4,7 @@ A purpose-built Meta Quest 3 WebXR experience for walking captured construction 
 true scale. Built on the PlayCanvas engine and the open-source SuperSplat viewer runtime,
 self-hosted as a static site over HTTPS.
 
-Three sites ship with the app, each with its own points of interest and guided tour. A
+Four sites ship with the app, each with its own points of interest and guided tour. A
 link can name one directly (`?site=komatsu`), and the url tracks whatever is on screen.
 
 Three sites, each with its own points of interest and guided tour:
@@ -128,6 +128,62 @@ Each site declares `worldScale`, the metres-per-scene-unit factor applied to the
 the collision data. It was measured from the capture itself: for the plant yard, two
 machines of known type measure 2.0 and 2.2 units tall, giving 3.6 m/unit; for the formwork
 floor, the 5.7-unit deck-to-soffit distance and the 3.1-unit shoring grid give 0.75 m/unit.
+
+## Bringing in a design model
+
+A site can be a mesh model instead of a splat. Three input formats convert on Linux, none
+of them needing the authoring application:
+
+| From | With | Notes |
+| --- | --- | --- |
+| **IFC** | `tools/ifc-to-glb.py` (IfcOpenShell) | the best input: keeps structure and material colours |
+| **FBX** | [FBX2glTF](https://github.com/facebookincubator/FBX2glTF) | what Revit exports directly; check the export actually carried the walls |
+| **SketchUp** | `tools/skp-to-glb.py` (OpenSKP) | no Trimble SDK needed; writes millimetres |
+
+Every route then goes through the same second step, which is not optional:
+
+```sh
+node tools/optimize-glb.mjs /tmp/model.glb public/bim/model.glb \
+    --scale 0.0254 --double-sided --ground 4
+```
+
+- **`--scale`** converts to metres. Revit FBX exports are usually in inches (0.0254),
+  SketchUp in millimetres (0.001). Check against something you know: a 55 inch desk.
+- **Baking node transforms** happens always. IFC and FBX both express their up-axis as a
+  rotation per node, and the collision code reads vertex buffers without walking the node
+  graph — an unbaked model collides in a different orientation from the one you see.
+- **`--double-sided`** because architectural exports are single-sided with faces pointing
+  outward. Seen from inside, which is the whole point, those walls vanish.
+- **`--ground`** adds a floor plane at the model's base. A design model has no site, so
+  without one a visitor who steps off the slab falls forever.
+
+Then add a site to `src/config.ts` with `model: { url }` and `collision: { type: 'mesh' }`.
+The mesh is its own collision surface: walls stop you, floors carry you, the teleport arc
+lands on them. `src/xr/model-collision.ts` reads the triangles off the instantiated entity
+rather than downloading the glb twice — the engine caches by url, so a second asset's
+unload would destroy the geometry the first is drawing.
+
+### What does not convert
+
+`.rvt` is Autodesk's proprietary format and nothing open reads its geometry. The clean-room
+reader on PyPI parses the file structure but writes an IFC with no walls in it. Export from
+Revit instead — **File → Export → IFC**, or FBX from a 3D view with everything visible —
+or convert through Autodesk Platform Services.
+
+### Keeping a licensed model out of a public repository
+
+Git history is permanent: a file deleted in a later commit is still in every clone. Set
+`VITE_ASSET_BASE` at build time to serve scene assets from somewhere else, so the model
+never enters the repository at all:
+
+```sh
+VITE_ASSET_BASE=https://assets.example.com/sitexr npm run build
+```
+
+Only the splat, collision and model urls are redirected; the app's own images stay local,
+and the bucket must allow cross-origin reads. `public/private/` and the model formats are
+gitignored, and `bash tools/install-hooks.sh` adds a pre-commit hook that refuses to commit
+them by accident.
 
 ## Asset pipeline (Linux, Node only)
 

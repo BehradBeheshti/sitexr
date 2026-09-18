@@ -104,6 +104,14 @@ if (groundArg !== -1) {
     console.log(`ground plane at y=${y.toFixed(2)}, ${(x1 - x0).toFixed(0)}x${(z1 - z0).toFixed(0)} m`);
 }
 
+// Architectural exports are usually single-sided, with wall faces pointing outward. Seen
+// from inside the building — which is the whole point — those walls vanish. Marking the
+// materials double-sided costs nothing here and makes the model behave like a room.
+if (process.argv.includes('--double-sided')) {
+    for (const mat of doc.getRoot().listMaterials()) mat.setDoubleSided(true);
+    console.log(`marked ${doc.getRoot().listMaterials().length} materials double-sided`);
+}
+
 await io.write(dst, doc);
 const root = doc.getRoot();
 let min = [Infinity, Infinity, Infinity];

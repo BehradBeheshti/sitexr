@@ -50,9 +50,10 @@ await page.evaluateOnNewDocument((id) => {
         // ignore
     }
 }, siteId);
-await page.goto(base, { waitUntil: 'domcontentloaded' });
+// a deep link names the site, which also skips the experience chooser
+await page.goto(`${base}?site=${siteId}`, { waitUntil: 'domcontentloaded' });
 await page.waitForFunction(() => !document.getElementById('enter')?.disabled, { timeout: 300000 });
-await page.click('#enter');
+await page.evaluate(() => document.getElementById('enter').click());
 await new Promise((r) => setTimeout(r, 3500));
 await page.screenshot({ path: join(out, '00-spawn.png') });
 

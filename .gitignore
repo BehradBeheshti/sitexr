@@ -5,3 +5,11 @@ test-output/
 *.log
 public/scene-src/
 media/
+
+# Licensed or client-owned assets. Anything here is served by the app but never
+# committed: a public repository's history is permanent, and deleting a file in a
+# later commit does not remove it from clones.
+public/private/
+*.ifc
+*.rvt
+*.rte

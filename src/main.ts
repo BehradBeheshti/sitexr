@@ -3,8 +3,8 @@
 import { Vec3, platform } from 'playcanvas';
 import type { Entity, GSplatComponent } from 'playcanvas';
 
-import { ASSETS, DEFAULT_SITE, EYE_HEIGHT, SITES, viewerSettings } from './config';
-import type { Poi, Site, TourStop } from './config';
+import { ASSETS, DEFAULT_SITE, EYE_HEIGHT, MODES, SITES, assetUrl, defaultSiteOf, modeOf, viewerSettings } from './config';
+import type { ModeId, Poi, Site, TourStop } from './config';
 import { BUDGETS, FOVEATION, settings } from './settings';
 import { Screens } from './ui/screens';
 import { createViewer } from './vendor/supersplat-viewer/index';
@@ -51,9 +51,11 @@ const main = async () => {
     let session: Session | null = null;
     let starting: Promise<Session> | null = null;
 
-    // A shareable link can name a site directly: ?site=komatsu
+    // A shareable link can name the experience or the site, so each audience can be handed
+    // its own url: ?mode=design for the models, ?mode=capture for the scans.
     const params = new URLSearchParams(location.search);
     const urlSite = SITES.find((s) => s.id === params.get('site'));
+    const urlMode = MODES.find((m) => m.id === params.get('mode'))?.id ?? null;
 
     let stored: string | null = null;
     try {
@@ -62,15 +64,26 @@ const main = async () => {
         stored = null;
     }
     let selected =
-        urlSite ?? SITES.find((s) => s.id === stored) ?? SITES.find((s) => s.id === DEFAULT_SITE) ?? SITES[0];
+        urlSite ??
+        (urlMode ? defaultSiteOf(urlMode) : null) ??
+        SITES.find((s) => s.id === stored) ??
+        SITES.find((s) => s.id === DEFAULT_SITE) ??
+        SITES[0];
+    // The chooser is shown unless the link (or a previous visit) already picked a side.
+    let mode: ModeId | null = urlSite ? urlSite.kind : (urlMode ?? null);
 
     const syncUrl = () => {
-        history.replaceState(null, '', `${location.pathname}?site=${selected.id}`);
+        const q = new URLSearchParams();
+        if (mode) q.set('mode', mode);
+        q.set('site', selected.id);
+        history.replaceState(null, '', `${location.pathname}?${q.toString()}`);
     };
 
     const screens = new Screens({
         sites: SITES,
         selected: selected.id,
+        mode,
+        onSelectMode: (id) => selectMode(id),
         onSelectSite: (id) => selectSite(id),
         onEnter: () => enter(),
         onTour: () => sessionTour()?.toggle(),
@@ -88,6 +101,18 @@ const main = async () => {
     const sessionTour = () => api?.tour ?? null;
     const sessionApi = () => api;
 
+    const selectMode = async (id: ModeId) => {
+        mode = id;
+        screens.setMode(id);
+        const first = defaultSiteOf(id);
+        if (first && first.id !== selected.id) {
+            await selectSite(first.id);
+        } else {
+            screens.setSelected(selected.id);
+            syncUrl();
+        }
+    };
+
     const selectSite = async (id: string) => {
         const site = SITES.find((s) => s.id === id);
         if (!site || site.id === selected.id) return;
@@ -97,6 +122,7 @@ const main = async () => {
         } catch {
             // ignore
         }
+        mode = modeOf(id);
         screens.setSelected(id);
         syncUrl();
         await startSelected();
@@ -144,7 +170,7 @@ const main = async () => {
         screens.setProgress(2, 'Connecting to site data…');
 
         const collisionPromise: Promise<Collision | null> | undefined =
-            site.collision.type === 'grid' ? GridCollision.load(site.collision.url) : undefined;
+            site.collision.type === 'grid' ? GridCollision.load(assetUrl(site.collision.url)) : undefined;
         let collision: Collision | null = null;
         // built once from the instantiated model, and shared with the viewer
         let meshCollision: Collision | null = null;
@@ -156,12 +182,12 @@ const main = async () => {
         const viewer = await createViewer({
             container,
             settings: viewerSettings(site),
-            contentUrl: site.contentUrl,
+            contentUrl: site.contentUrl ? assetUrl(site.contentUrl) : undefined,
             // voxel collision is loaded by the viewer from a url; a navigation grid is
             // ours, and mesh collision is read off the model once it is in the scene
-            collisionUrl: site.collision.type === 'voxel' ? site.collision.url : undefined,
+            collisionUrl: site.collision.type === 'voxel' ? assetUrl(site.collision.url) : undefined,
             collision: collisionPromise,
-            modelUrl: site.model?.url,
+            modelUrl: site.model ? assetUrl(site.model.url) : undefined,
             collisionFromModel: site.collision.type === 'mesh' ? buildMeshCollision : undefined,
             modelTransform: site.model
                 ? { scale: site.model.scale, offset: site.model.offset, yaw: site.model.yaw }
