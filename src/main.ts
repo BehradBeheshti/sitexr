@@ -55,8 +55,9 @@ const main = async () => {
         posterUrl: undefined,
         ui: false,
         nofx: true,
-        // WebXR needs the WebGL backend; desktops without VR get WebGPU where available
-        renderer: vrSupported ? 'webgl' : 'webgpu',
+        // WebGL everywhere: WebXR requires it, and it avoids partial WebGPU implementations
+        // (some Linux/Chrome GPU stacks reject small buffers and canvas uploads).
+        renderer: 'webgl',
         budget: budgetFor(),
         controllerProfilesUrl: ASSETS.controllerProfilesUrl,
         floorHeightAt: (x, y, z) => (collision ? (collision.queryRay(x, y, z, 0, -1, 0, 40)?.y ?? null) : null)
