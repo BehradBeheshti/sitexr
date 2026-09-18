@@ -261,8 +261,35 @@ If something feels wrong, the menu's *Comfort settings* has turning mode, walk s
 movement vignette, teleport on/off and three quality tiers. Quality *Low* is the safest if
 the frame rate drops.
 
+### Holding the frame rate
+
+WebXR forces the WebGL path, where splats are depth-sorted **on the CPU every frame, for
+both eyes, inside 13.9 ms**. That makes the splat budget the thing that decides whether a
+headset holds 72 Hz, and it is why the headset budgets in `src/settings.ts` are a fraction
+of the desktop ones.
+
+Three mechanisms keep it smooth:
+
+- **A performance governor** (`src/xr/performance.ts`) measures frame time and lowers the
+  splat budget whenever frames run long, then gives the detail back when there is headroom.
+  It never exceeds the tier chosen in Comfort settings, and it enters a session below that
+  ceiling rather than at it, so the first seconds are not the worst ones.
+- **Fixed foveation** drops resolution at the edge of the lens, away from where the eye is
+  pointed, and is raised further while the governor is limiting detail.
+- **A wider colour-update angle** in XR. Outside a headset the viewer rebuilds the splat
+  work buffer after a fifth of a degree of camera rotation; in a headset the head never
+  stops moving, so that rebuild becomes a constant spike. This is usually what "unstable"
+  turns out to be, as distinct from a low average frame rate.
+
+The framebuffer scale is the one knob that cannot be changed mid-session: WebXR only
+allows it to be chosen when the session starts, so it comes from the quality tier.
+
+A headset defaults to the *Low* tier. A smooth first minute matters more than detail, and
+the tier is one button press away in the menu.
+
 Add **`?fps`** to the url for a frame-rate readout inside the headset, showing the current
-rate, the lowest seen and the splat budget in force. The Quest renders both eyes at 72 Hz,
+rate, the lowest seen, the splat budget in force (with an arrow when the governor is
+limiting) and the foveation level. The Quest renders both eyes at 72 Hz,
 so anything sitting below about 68 is worth reporting. Changing quality resets the low
 reading, which makes the three tiers easy to compare.
 

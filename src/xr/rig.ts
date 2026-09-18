@@ -13,7 +13,7 @@ import type { AppBase, Layer, StandardMaterial, XrInputSource } from 'playcanvas
 import { XrNavigation } from 'playcanvas/scripts/esm/xr/xr-navigation.mjs';
 
 
-import { FRAMEBUFFER_SCALE, SPEEDS, settings } from '../settings';
+import { FOVEATION, FRAMEBUFFER_SCALE, SPEEDS, settings } from '../settings';
 import type { Collision } from '../vendor/supersplat-viewer/collision';
 import { findCylinderSpawn } from '../vendor/supersplat-viewer/collision/find-spawn';
 import { Panel, THEME, unlitMaterial } from './panel';
@@ -217,12 +217,15 @@ export class XrRig {
         this.fadeTarget = 1;
         this.setPanelAlpha(this.fadePanel, 1);
         this.fadePanel.show();
-        // fixed foveation is free performance on Quest: the periphery is mud anyway
+        // Fixed foveation drops resolution at the edge of the lens, away from where the eye
+        // is pointed. On a splat scene that is close to free performance. The governor
+        // raises it further when it has to hold detail back.
         try {
-            const layer = (this.app.xr.session as any)?.renderState?.baseLayer;
-            if (layer && 'fixedFoveation' in layer) layer.fixedFoveation = 0.6;
+            if (this.app.xr.fixedFoveation !== null) {
+                this.app.xr.fixedFoveation = FOVEATION[settings.get().quality];
+            }
         } catch {
-            // not supported: ignore
+            // not supported on this device
         }
         this.events.fire('session:start');
     }

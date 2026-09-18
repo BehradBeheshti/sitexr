@@ -8,6 +8,7 @@ import type { AppBase, Entity } from 'playcanvas';
 
 import { Panel, THEME } from './panel';
 import type { Layer } from 'playcanvas';
+import type { PerfState } from './performance';
 
 export class FpsReadout {
     private panel: Panel;
@@ -20,14 +21,14 @@ export class FpsReadout {
 
     private app: AppBase;
 
-    constructor(app: AppBase, camera: Entity, layer: Layer, budget: () => number) {
+    constructor(app: AppBase, camera: Entity, layer: Layer, perf: () => PerfState) {
         this.app = app;
         this.panel = new Panel(app, layer, { name: 'fps', width: 0.3, height: 0.1, pixels: 512, overlay: true });
         this.panel.entity.reparent(camera);
         this.panel.entity.setLocalPosition(0.2, -0.2, -0.7);
         this.panel.entity.setLocalEulerAngles(-12, 0, 0);
         this.panel.show();
-        this.draw(0, 0, budget());
+        this.draw(0, 0, perf());
 
         app.on('update', (dt: number) => {
             this.frames++;
@@ -35,7 +36,7 @@ export class FpsReadout {
             if (this.elapsed < 0.5) return;
             const fps = this.frames / this.elapsed;
             if (fps < this.worst && this.elapsed > 0.1) this.worst = fps;
-            this.draw(fps, this.worst, budget());
+            this.draw(fps, this.worst, perf());
             this.frames = 0;
             this.elapsed = 0;
         });
@@ -46,7 +47,7 @@ export class FpsReadout {
         this.worst = 999;
     }
 
-    private draw(fps: number, worst: number, budget: number) {
+    private draw(fps: number, worst: number, perf: PerfState) {
         this.panel.draw((ctx, w, h) => {
             ctx.fillStyle = 'rgba(10,13,18,0.82)';
             ctx.fillRect(0, 0, w, h);
@@ -59,7 +60,8 @@ export class FpsReadout {
             ctx.font = `500 26px ${THEME.font}`;
             ctx.fillText(`low ${worst > 900 ? '—' : worst.toFixed(0)}`, 20, h * 0.78);
             ctx.textAlign = 'right';
-            ctx.fillText(`${budget.toFixed(1)}M splats`, w - 20, h * 0.78);
+            const fov = perf.foveation === null ? '—' : perf.foveation.toFixed(1);
+            ctx.fillText(`${perf.budget.toFixed(2)}M${perf.limiting ? '↓' : ''} · fov ${fov}`, w - 20, h * 0.78);
         });
         this.app.renderNextFrame = true;
     }

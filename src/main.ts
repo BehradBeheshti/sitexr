@@ -5,7 +5,7 @@ import type { Entity } from 'playcanvas';
 
 import { ASSETS, DEFAULT_SITE, EYE_HEIGHT, MODES, SITES, defaultSiteOf, modeOf, viewerSettings } from './config';
 import type { ModeId, Poi, Site, TourStop } from './config';
-import { BUDGETS, settings } from './settings';
+import { BUDGETS, FOVEATION, settings } from './settings';
 import { Screens } from './ui/screens';
 import { createViewer } from './vendor/supersplat-viewer/index';
 import type { Collision } from './vendor/supersplat-viewer/collision';
@@ -20,6 +20,7 @@ import { Tour } from './xr/tour';
 import type { TourPresenter } from './xr/tour';
 import { Tutorial } from './xr/tutorial';
 import { FpsReadout } from './xr/fps-readout';
+import { PerformanceGovernor } from './xr/performance';
 
 const detectVr = async (): Promise<boolean> => {
     try {
@@ -217,9 +218,13 @@ const main = async () => {
         if (!collision) console.warn('SiteXR: collision data missing, terrain following disabled');
 
         const layer = getUiLayer(app, camera);
+
+        // Holds the headset's frame rate by trading splat detail for smoothness.
+        const governor = new PerformanceGovernor(app, budgetFor, () => FOVEATION[settings.get().quality]);
+
         // ?fps shows a frame-rate readout in the headset; it is a diagnostic, not a feature
         if (params.has('fps')) {
-            const fpsReadout = new FpsReadout(app, camera, layer, budgetFor);
+            const fpsReadout = new FpsReadout(app, camera, layer, () => governor.state);
             settings.events.on('change:quality', () => fpsReadout.reset());
         }
         const rig = new XrRig(app, camera, collision, layer, { spawn: site.spawn, walkRadius: site.walkRadius });
@@ -367,7 +372,7 @@ const main = async () => {
             tour.setPresenter(vrPresenter);
             tour.stop();
             screens.hideHud();
-            app.scene.gsplat.splatBudget = budgetFor() * 1e6;
+            // the governor sets the budget from here on
         });
         rig.events.on('session:end', () => {
             tour.stop();
@@ -385,7 +390,9 @@ const main = async () => {
         });
 
         const onQuality = () => {
-            app.scene.gsplat.splatBudget = budgetFor() * 1e6;
+            // in a session the governor owns the budget; outside one it is set directly
+            if (app.xr.active) governor.retarget();
+            else app.scene.gsplat.splatBudget = budgetFor() * 1e6;
             app.renderNextFrame = true;
         };
         settings.events.on('change:quality', onQuality);
