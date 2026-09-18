@@ -150,15 +150,18 @@ export class Markers {
             return;
         }
         this.openPoi = poi;
-        // between the marker and the visitor, at a readable distance
+        // Between the marker and the visitor, at a readable distance. The height is kept
+        // near eye level whatever the marker's elevation: a marker seven metres up a haul
+        // truck would otherwise put the card above the visitor's comfortable view.
         const head = this.camera.getPosition();
         const mp = new Vec3(poi.marker[0], poi.marker[1], poi.marker[2]);
         const dir = tmp.sub2(mp, head);
         const dist = dir.length();
         dir.normalize();
         const d = Math.min(1.6, Math.max(1.1, dist - 0.6));
-        this.card.entity.setPosition(head.x + dir.x * d, head.y + dir.y * d + 0.05, head.z + dir.z * d);
-        this.card.faceToward(head);
+        const y = Math.max(head.y - 0.45, Math.min(head.y + 0.1, head.y + dir.y * d));
+        this.card.entity.setPosition(head.x + dir.x * d, y, head.z + dir.z * d);
+        this.card.faceToward(head, true);
         this.card.show();
         this.rig.interactables.add(this.card);
         this.renderCard();

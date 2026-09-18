@@ -247,7 +247,11 @@ export class Panel implements Interactable {
         this.entity.lookAt(tmpOrigin, Vec3.UP);
     }
 
-    /** Turns the +Z face toward a world position (billboarding). */
+    /**
+     * Turns the +Z face toward a world position (billboarding). With `upright` the panel
+     * yaws to face the viewer but stays vertical, which reads better for text than a
+     * surface tilted back at the reader.
+     */
     faceToward(pos: Vec3, upright = false) {
         const p = this.entity.getPosition();
         tmpOrigin.set(p.x * 2 - pos.x, upright ? p.y : p.y * 2 - pos.y, p.z * 2 - pos.z);
