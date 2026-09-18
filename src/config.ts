@@ -107,9 +107,9 @@ const excavator: Site = {
             id: 'access',
             index: 3,
             title: 'Site access & terrain',
-            text: 'The haul route climbs a soft, uneven bank toward the stockpile. Review the gradient and drainage before plant is routed this way, and keep the pedestrian route separated from the machine swing radius.',
-            marker: [11.5, 3.6, -14.0],
-            stand: { x: 6.0, z: -9.0, look: [12.0, 3.4, -16.0] }
+            text: 'Rutted, saturated ground on the approach to the working platform, with the site compound beyond. Review the route and drainage before plant is sent this way, and keep the pedestrian route clear of the machine swing radius.',
+            marker: [9.0, 1.6, -3.0],
+            stand: { x: 14.0, z: -6.0, look: [4.0, 3.0, 2.0] }
         }
     ],
     tour: [
@@ -117,7 +117,7 @@ const excavator: Site = {
         { title: 'Working side', text: 'From here the boom, stick and bucket are visible in full. Note the raised boom and clear swing radius.', x: -9.0, z: 4.0, look: [2.0, 2.5, -1.5], dwell: 10 },
         { title: 'Running gear', text: 'The tracks sit in deep, saturated mud. This is the ground and track-condition point of interest.', x: -1.0, z: 6.5, look: [4.0, 1.2, 0.5], dwell: 10 },
         { title: 'Rear and counterweight', text: 'The rear of the machine and the ground it has just cleared. Watch the change in surface level.', x: 8.5, z: -6.0, look: [2.5, 2.6, -2.0], dwell: 9 },
-        { title: 'Access route', text: 'The haul route rises over soft ground toward the bank. This is the site-access and terrain point of interest.', x: 6.0, z: -9.0, look: [12.0, 3.4, -16.0], dwell: 10 },
+        { title: 'Access route', text: 'The approach to the working platform, rutted and saturated, with the site compound beyond. This is the site-access and terrain point of interest.', x: 14.0, z: -6.0, look: [4.0, 3.0, 2.0], dwell: 10 },
         { title: 'End of tour', text: 'You are back at the arrival point. Explore freely, or open the menu with the B button.', x: 1.0, z: 10.5, look: [1.6, 2.4, -0.8], dwell: 6 }
     ],
     credits: {
