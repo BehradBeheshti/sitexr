@@ -19,6 +19,7 @@ import { XrRig } from './xr/rig';
 import { Tour } from './xr/tour';
 import type { TourPresenter } from './xr/tour';
 import { Tutorial } from './xr/tutorial';
+import { FpsReadout } from './xr/fps-readout';
 
 const detectVr = async (): Promise<boolean> => {
     try {
@@ -216,6 +217,11 @@ const main = async () => {
         if (!collision) console.warn('SiteXR: collision data missing, terrain following disabled');
 
         const layer = getUiLayer(app, camera);
+        // ?fps shows a frame-rate readout in the headset; it is a diagnostic, not a feature
+        if (params.has('fps')) {
+            const fpsReadout = new FpsReadout(app, camera, layer, budgetFor);
+            settings.events.on('change:quality', () => fpsReadout.reset());
+        }
         const rig = new XrRig(app, camera, collision, layer, { spawn: site.spawn, walkRadius: site.walkRadius });
 
         const tour = new Tour(site.tour, { travel: async () => {}, caption: () => {}, end: () => {} }, () => {

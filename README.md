@@ -261,6 +261,11 @@ If something feels wrong, the menu's *Comfort settings* has turning mode, walk s
 movement vignette, teleport on/off and three quality tiers. Quality *Low* is the safest if
 the frame rate drops.
 
+Add **`?fps`** to the url for a frame-rate readout inside the headset, showing the current
+rate, the lowest seen and the splat budget in force. The Quest renders both eyes at 72 Hz,
+so anything sitting below about 68 is worth reporting. Changing quality resets the low
+reading, which makes the three tiers easy to compare.
+
 ## Verification
 
 Two suites, both headless, both runnable without a headset:
