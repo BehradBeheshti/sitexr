@@ -3,8 +3,8 @@
 import { Vec3, platform } from 'playcanvas';
 import type { Entity } from 'playcanvas';
 
-import { ASSETS, DEFAULT_SITE, EYE_HEIGHT, SITES, viewerSettings } from './config';
-import type { Poi, Site, TourStop } from './config';
+import { ASSETS, DEFAULT_SITE, EYE_HEIGHT, MODES, SITES, defaultSiteOf, modeOf, viewerSettings } from './config';
+import type { ModeId, Poi, Site, TourStop } from './config';
 import { BUDGETS, settings } from './settings';
 import { Screens } from './ui/screens';
 import { createViewer } from './vendor/supersplat-viewer/index';
@@ -49,17 +49,39 @@ const main = async () => {
     let session: Session | null = null;
     let starting: Promise<Session> | null = null;
 
+    // A shareable link can name the experience or the site directly, so each audience can
+    // be handed its own url: ?mode=design for BIM, ?mode=capture for the scans.
+    const params = new URLSearchParams(location.search);
+    const urlSite = SITES.find((s) => s.id === params.get('site'));
+    const urlMode = MODES.find((m) => m.id === params.get('mode'))?.id ?? null;
+
     let stored: string | null = null;
     try {
         stored = localStorage.getItem(SITE_KEY);
     } catch {
         stored = null;
     }
-    let selected = SITES.find((s) => s.id === stored) ?? SITES.find((s) => s.id === DEFAULT_SITE) ?? SITES[0];
+    let selected =
+        urlSite ??
+        (urlMode ? defaultSiteOf(urlMode) : null) ??
+        SITES.find((s) => s.id === stored) ??
+        SITES.find((s) => s.id === DEFAULT_SITE) ??
+        SITES[0];
+    // The chooser is shown unless the link (or a previous visit) already picked a side.
+    let mode: ModeId | null = urlSite ? urlSite.kind : (urlMode ?? null);
+
+    const syncUrl = () => {
+        const q = new URLSearchParams();
+        if (mode) q.set('mode', mode);
+        q.set('site', selected.id);
+        history.replaceState(null, '', `${location.pathname}?${q.toString()}`);
+    };
 
     const screens = new Screens({
         sites: SITES,
         selected: selected.id,
+        mode,
+        onSelectMode: (id) => selectMode(id),
         onSelectSite: (id) => selectSite(id),
         onEnter: () => enter(),
         onTour: () => sessionTour()?.toggle(),
@@ -77,6 +99,18 @@ const main = async () => {
     const sessionTour = () => api?.tour ?? null;
     const sessionApi = () => api;
 
+    const selectMode = async (id: ModeId) => {
+        mode = id;
+        screens.setMode(id);
+        const first = defaultSiteOf(id);
+        if (first && first.id !== selected.id) {
+            await selectSite(first.id);
+        } else {
+            screens.setSelected(selected.id);
+            syncUrl();
+        }
+    };
+
     const selectSite = async (id: string) => {
         const site = SITES.find((s) => s.id === id);
         if (!site || site.id === selected.id) return;
@@ -86,7 +120,9 @@ const main = async () => {
         } catch {
             // ignore
         }
+        mode = modeOf(id);
         screens.setSelected(id);
+        syncUrl();
         await startSelected();
     };
 
@@ -413,6 +449,7 @@ const main = async () => {
         };
     };
 
+    syncUrl();
     await startSelected();
 };
 

@@ -4,7 +4,20 @@ A purpose-built Meta Quest 3 WebXR experience for walking captured construction 
 true scale. Built on the PlayCanvas engine and the open-source SuperSplat viewer runtime,
 self-hosted as a static site over HTTPS.
 
-Three sites ship with the app, each with its own points of interest and guided tour:
+The app opens on a choice between two experiences, so each audience can be handed its own
+link:
+
+| Experience | Link | For |
+| --- | --- | --- |
+| **Captured Sites** | `?mode=capture` | site teams reviewing what is actually there |
+| **Design Models** | `?mode=design` | design and BIM teams reviewing what is drawn |
+
+A link can also name a site directly (`?site=komatsu`), which picks the right experience
+with it. The url updates as you change site, so whatever is on screen can be copied and
+shared. Inside VR, *Switch site* leaves the headset and returns to the picker for the
+current experience.
+
+Four sites ship with the app, each with its own points of interest and guided tour:
 
 | Site | What it is | Scale |
 | --- | --- | --- |
@@ -233,8 +246,9 @@ tools/                      asset pipeline, IFC to glTF conversion, navigation g
 ## First run on a Quest 3
 
 1. Put the headset on and open **https://behradbeheshti.github.io/sitexr/** in the Meta
-   Quest Browser. Nothing to install, no sideloading, no developer mode.
-2. Pick a site from the three cards, wait for *Site ready*, and press **Enter Site**. The
+   Quest Browser. Nothing to install, no sideloading, no developer mode. To skip the
+   chooser, use `?mode=capture` or `?mode=design`.
+2. Choose an experience, pick a site, wait for *Site ready*, and press **Enter Site**. The
    headset asks once for permission to enter immersive mode; accept it.
 3. A five-step controller tutorial runs the first time. Each step completes when you
    actually perform the input, so it doubles as a controller check. *Skip tutorial* is

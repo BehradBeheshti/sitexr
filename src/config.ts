@@ -47,8 +47,39 @@ export type Credits = {
     changes: string;
 };
 
+/** The two ways into the app: a captured site, or a model of one not built yet. */
+export type ModeId = 'capture' | 'design';
+
+export type Mode = {
+    id: ModeId;
+    name: string;
+    tagline: string;
+    blurb: string;
+    /** What the Enter button leads to, in one phrase. */
+    audience: string;
+};
+
+export const MODES: Mode[] = [
+    {
+        id: 'capture',
+        name: 'Captured Sites',
+        tagline: 'Reality capture · Gaussian splats',
+        blurb: 'Walk real sites recorded as 3D scans: earthworks, heavy plant and a floor under construction, at the scale and condition they were captured in.',
+        audience: 'for site teams reviewing what is actually there'
+    },
+    {
+        id: 'design',
+        name: 'Design Models',
+        tagline: 'BIM · IFC building models',
+        blurb: 'Walk a building information model at full size, the way it would be reviewed before anything is built.',
+        audience: 'for design and BIM teams reviewing what is drawn'
+    }
+];
+
 export type Site = {
     id: string;
+    /** Which of the two experiences this site belongs to. */
+    kind: ModeId;
     name: string;
     subtitle: string;
     /** One sentence on the welcome card. */
@@ -81,6 +112,7 @@ export const TECH_CREDIT =
 
 const excavator: Site = {
     id: 'excavator',
+    kind: 'capture',
     name: 'Muddy Excavator Site',
     subtitle: 'Earthworks · tracked excavator · access review',
     blurb: 'Walk the excavation at true scale, inspect the tracked excavator and review ground and access conditions.',
@@ -140,6 +172,7 @@ const excavator: Site = {
 // 2.0 and 2.2 units tall, which is a 7.4 m haul truck and an 8 m mining excavator.
 const komatsu: Site = {
     id: 'komatsu',
+    kind: 'capture',
     name: 'Heavy Plant Yard',
     subtitle: 'Mining haul truck · hydraulic excavator · display yard',
     blurb: 'Stand beside a 290-tonne haul truck and a mining excavator at their real size, and see what heavy plant looks like from the ground.',
@@ -199,6 +232,7 @@ const komatsu: Site = {
 // 5.7 units (a 4.3 m floor) and the shoring towers sit on a 3.1 unit (2.3 m) grid.
 const scaffold: Site = {
     id: 'scaffold',
+    kind: 'capture',
     name: 'Formwork & Scaffold Floor',
     subtitle: 'Interior · slab formwork · shoring towers',
     blurb: 'Walk a floor under construction between shoring towers and check bracing, prop heads and the access lane.',
@@ -258,8 +292,9 @@ const scaffold: Site = {
 // what a BIM review needs. See tools/ifc-to-glb.py for the conversion.
 const bim: Site = {
     id: 'bim',
+    kind: 'design',
     name: 'Design Model (BIM)',
-    subtitle: 'IFC building model · design intent, not a capture',
+    subtitle: 'IFC export · two blocks · walk the outside',
     blurb: 'Walk around a building information model at full size: the building as drawn, before anything is built.',
     tag: 'BIM model',
     poster: 'brand/poster-bim.webp',
@@ -314,6 +349,10 @@ const bim: Site = {
 
 export const SITES: Site[] = [excavator, komatsu, scaffold, bim];
 export const DEFAULT_SITE = excavator.id;
+
+export const sitesOf = (mode: ModeId) => SITES.filter((s) => s.kind === mode);
+export const modeOf = (siteId: string): ModeId => SITES.find((s) => s.id === siteId)?.kind ?? 'capture';
+export const defaultSiteOf = (mode: ModeId) => sitesOf(mode)[0];
 
 /** Viewer experience settings (schema v2) for a site. Post effects stay off for a matching XR/desktop look. */
 export const viewerSettings = (site: Site) => ({
