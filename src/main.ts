@@ -321,5 +321,18 @@ const main = async () => {
 main().catch((err) => {
     console.error('SiteXR failed to start', err);
     const label = document.getElementById('progress-label');
-    if (label) label.textContent = 'The site could not be loaded. Please refresh to try again.';
+    const note = document.getElementById('mode-note');
+    const noGraphics = /webgl|graphics device|context/i.test(String(err?.message ?? err));
+    if (label) {
+        label.textContent = noGraphics
+            ? '3D graphics are unavailable in this browser.'
+            : 'The site could not be loaded. Please refresh to try again.';
+    }
+    if (note && noGraphics) {
+        note.textContent =
+            'Enable hardware acceleration (Chrome: Settings → System) or check the graphics driver, then reload. On a Meta Quest headset this works out of the box.';
+    }
+    const sub = document.getElementById('enter-sub');
+    if (sub) sub.textContent = 'Unavailable';
+    document.getElementById('overlay')?.setAttribute('data-state', 'error');
 });
