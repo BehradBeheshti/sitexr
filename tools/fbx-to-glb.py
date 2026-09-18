@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Converts an FBX (what Revit exports) to GLB, using assimp.
+"""Converts an FBX or OBJ (what Revit and the Autodesk cloud export) to GLB, using assimp.
 
     python3 -m venv .venv && .venv/bin/pip install pyassimp trimesh scipy
     sudo apt install libassimp5            # the native library pyassimp binds to

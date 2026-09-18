@@ -88,7 +88,7 @@ export const MODES: Mode[] = [
     {
         id: 'design',
         name: 'Design Models',
-        tagline: 'BIM · Revit and IFC models',
+        tagline: 'BIM · SketchUp, Revit and IFC models',
         blurb: 'Walk a building information model at full size, the way it would be reviewed before anything is built.',
         audience: 'for design and BIM teams reviewing what is drawn'
     }
@@ -302,67 +302,67 @@ const scaffold: Site = {
     }
 };
 
-// A design model rather than a capture: a Revit office interior exported to FBX and
-// converted to glTF. The mesh is its own collision surface, so the walls stop you and the
-// slab carries you, which is what walking a model is for.
-const officeInterior: Site = {
-    id: 'office',
+// A design model rather than a capture: the project's SketchUp file, read with OpenSKP and
+// converted to glTF. The mesh is its own collision surface, so the furniture blocks you and
+// the floor carries you, which is what walking a model is for.
+const model2: Site = {
+    id: 'model2',
     kind: 'design',
-    name: 'Office Interior',
-    subtitle: 'Revit model · 10.5 × 5.9 m room · walk inside it',
-    blurb: 'Walk inside an office as modelled: walls, floor, desks and clearances at the sizes the drawing gives them.',
-    tag: 'Revit model',
-    poster: 'brand/poster-office.webp',
-    model: { url: 'bim/office-interior.glb' },
-    collision: { type: 'mesh', url: 'bim/office-interior.glb' },
+    name: 'Model 2',
+    subtitle: 'SketchUp model \u00b7 sofa, armchair, coffee table',
+    blurb: 'Your SketchUp file as it was authored: a sofa, an armchair and a coffee table, at full size on an open floor. Walk around them and judge the proportions the way you would in a showroom.',
+    tag: 'SketchUp model',
+    poster: 'brand/poster-model2.webp',
+    model: { url: 'bim/model2-sketchup.glb' },
+    collision: { type: 'mesh', url: 'bim/model2-sketchup.glb' },
     worldScale: 1,
-    spawn: { x: 2.4, z: 1.8, floor: 0, look: [-6.0, 1.5, 1.8] },
-    walkRadius: 12,
-    background: [0.72, 0.75, 0.79],
+    spawn: { x: 1.6, z: 2.4, floor: 0, look: [1.6, 0.5, -1.7] },
+    walkRadius: 5.5,
+    background: [0.78, 0.79, 0.81],
     pois: [
         {
-            id: 'desks',
+            id: 'seat',
             index: 1,
-            title: 'Desk layout',
-            text: 'Desks and task chairs where the model places them. Standing among them is the quickest way to judge whether the spacing works for the people who will use it.',
-            marker: [-2.0, 1.3, 1.8],
-            stand: { x: 0.6, z: 1.8, look: [-2.0, 0.9, 1.8] }
+            title: 'Seat height',
+            text: 'The tallest point of this model is 740 mm above the floor. Seat and back heights are the numbers a drawing states and the eye argues with, so stand beside it and look down.',
+            marker: [2.2, 0.9, -3.0],
+            stand: { x: 2.2, z: -1.6, look: [2.2, 0.7, -2.9] }
         },
         {
-            id: 'walls',
+            id: 'footprint',
             index: 2,
-            title: 'Walls & openings',
-            text: 'Generic 200 mm partitions with their openings as drawn. On review these are checked against the room data sheet, and later against what was actually built.',
-            marker: [-6.6, 1.8, 1.8],
-            stand: { x: -3.6, z: 1.8, look: [-6.8, 1.6, 1.8] }
+            title: 'Footprint',
+            text: 'The group covers 2.57 m across by 3.44 m deep. Pacing that out tells you more about whether it fits a room than the plan view does.',
+            marker: [0.5, 0.9, -1.7],
+            stand: { x: -1.2, z: -1.7, look: [1.6, 0.4, -1.7] }
         },
         {
-            id: 'height',
+            id: 'clearance',
             index: 3,
-            title: 'Ceiling height',
-            text: 'Floor to soffit is 3.66 m here. Height is the hardest dimension to judge from a drawing and the easiest to judge standing under it.',
-            marker: [-1.8, 3.4, 3.4],
-            stand: { x: -1.8, z: 3.4, look: [-1.8, 3.5, 2.0] }
+            title: 'Circulation',
+            text: 'Walk the gap you would leave in front of it. Under about 900 mm a route past furniture starts to feel tight, and that is easier to feel than to measure.',
+            marker: [1.6, 0.9, 0.6],
+            stand: { x: 1.6, z: 1.3, look: [1.6, 0.4, -1.4] }
         }
     ],
     tour: [
-        { title: 'Arrival', text: 'A design model, not a capture: this is the room as drawn, at full size.', x: 2.4, z: 1.8, look: [-6.0, 1.5, 1.8], dwell: 9 },
-        { title: 'Desk layout', text: 'Desks and chairs at their modelled positions. Judge the spacing by standing in it.', x: 0.6, z: 1.8, look: [-2.0, 0.9, 1.8], dwell: 10 },
-        { title: 'Walls', text: 'Partitions and openings as drawn, at the thickness the model gives them.', x: -3.6, z: 1.8, look: [-6.8, 1.6, 1.8], dwell: 10 },
-        { title: 'Ceiling', text: 'Floor to soffit: the dimension that is hardest to judge on paper.', x: -1.8, z: 3.4, look: [-1.8, 3.5, 2.0], dwell: 9 },
-        { title: 'End of tour', text: 'Back at the arrival point. Explore the room, or press B for the menu.', x: 2.4, z: 1.8, look: [-6.0, 1.5, 1.8], dwell: 6 }
+        { title: 'Arrival', text: 'A design model, not a capture: your SketchUp file at full size.', x: 1.6, z: 2.4, look: [1.6, 0.5, -1.7], dwell: 8 },
+        { title: 'Footprint', text: '2.57 m across, 3.44 m deep. Seen from the side, at the size it would really be.', x: -1.2, z: -1.7, look: [1.6, 0.4, -1.7], dwell: 9 },
+        { title: 'Seat height', text: '740 mm to the highest point. Look down on it rather than at it.', x: 2.2, z: -1.6, look: [2.2, 0.7, -2.9], dwell: 9 },
+        { title: 'Circulation', text: 'The gap in front, at walking distance.', x: 1.6, z: 1.3, look: [1.6, 0.4, -1.4], dwell: 8 },
+        { title: 'End of tour', text: 'Back at the arrival point. Explore freely, or press B for the menu.', x: 1.6, z: 2.4, look: [1.6, 0.5, -1.7], dwell: 6 }
     ],
     credits: {
-        sceneTitle: 'Office interior (Revit model)',
+        sceneTitle: 'Model 2.skp',
         sceneAuthor: 'supplied by the project',
         sceneLicense: 'not for redistribution',
         sceneLicenseUrl: '',
         sceneSourceUrl: '',
-        changes: 'Exported from Revit as FBX, read with assimp, rescaled from feet to metres, rotated from Z-up, node transforms baked in, meshes merged and materials made double-sided so the walls are visible from inside.'
+        changes: 'Read from the SketchUp file with OpenSKP, exported in millimetres and rescaled to metres, node transforms baked in, meshes merged, materials made double-sided and a floor plane added. The file contains three furniture components only \u2014 no building shell.'
     }
 };
 
-export const SITES: Site[] = [excavator, komatsu, scaffold, officeInterior];
+export const SITES: Site[] = [excavator, komatsu, scaffold, model2];
 export const DEFAULT_SITE = excavator.id;
 
 export const sitesOf = (mode: ModeId) => SITES.filter((s) => s.kind === mode);

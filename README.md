@@ -173,12 +173,35 @@ an 8 × 8 m room reduced to 9 m² of total surface, which looks like furniture f
 space. assimp reads the same file correctly. If a converted model looks sparse, measure its
 surface area before believing it.
 
-### What does not convert
+### `.rvt`, and why it needs Autodesk
 
-`.rvt` is Autodesk's proprietary format and nothing open reads its geometry. The clean-room
-reader on PyPI parses the file structure but writes an IFC with no walls in it. Export from
-Revit instead — **File → Export → IFC**, or FBX from a 3D view with everything visible —
-or convert through Autodesk Platform Services.
+A Revit file can be opened and read on Linux, but no mesh comes out of it, and the reason
+is worth knowing before anyone spends a day on it.
+
+`.rvt` is an OLE compound document. Its element data lives in the `Partitions/*` streams as
+a sequence of gzip members, each about 128 KB, and those do decompress: `Office Building.rvt`
+yields 43.6 MB of element records holding family and type names, unit definitions and
+double-precision control points in feet. What it does not hold is triangles. Revit stores a
+*parametric* model — a wall is a curve plus a type plus host constraints, and the mesh only
+exists once Revit's geometry kernel regenerates it. Reconstructing that means reimplementing
+the kernel, including the booleans that cut openings.
+
+So there are three real routes, and `tools/aps-convert.mjs` automates the third:
+
+1. **File → Export → IFC** in Revit, then `tools/ifc-to-glb.py`. Best quality, needs Revit.
+2. **ODA BimRv SDK**, which reads `.rvt` natively. Commercial licence.
+3. **Autodesk Platform Services**, which runs the real kernel in Autodesk's cloud:
+
+```sh
+# free account at https://aps.autodesk.com/ -> create an app -> Model Derivative API
+APS_CLIENT_ID=... APS_CLIENT_SECRET=... \
+    node tools/aps-convert.mjs "Office Building.rvt" out/office
+python3 tools/fbx-to-glb.py out/office.obj out/office-raw.glb
+node tools/optimize-glb.mjs out/office-raw.glb public/bim/office.glb \
+    --scale 0.3048 --double-sided --ground
+```
+
+That uploads the model to Autodesk. Check the licence before running it on a client file.
 
 ### Keeping a licensed model out of a public repository
 
