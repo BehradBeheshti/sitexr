@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0e1218" />
+    <meta name="description" content="SiteXR — Immersive Construction Review. Walk a captured excavation site in VR on Meta Quest 3." />
+    <title>SiteXR — Immersive Construction Review</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230e1218'/%3E%3Cpath d='M14 44h36v6H14zM18 22l14-10 14 10v6H18z' fill='%23f5a623'/%3E%3C/svg%3E" />
+    <link rel="stylesheet" href="/src/styles.css" />
+</head>
+<body>
+    <div id="viewer" aria-hidden="true"></div>
+
+    <!-- Loading / welcome -->
+    <section id="overlay" class="overlay" data-state="loading">
+        <div class="backdrop"></div>
+        <div class="grid"></div>
+        <header class="brand">
+            <span class="brand-mark" aria-hidden="true"></span>
+            <span class="brand-name">SiteXR</span>
+            <span class="brand-tag">Immersive Construction Review</span>
+        </header>
+
+        <div class="card" role="dialog" aria-labelledby="site-title">
+            <p class="eyebrow">Site capture · Reality model</p>
+            <h1 id="site-title">Muddy Excavator Site</h1>
+            <p class="lede">Walk the excavation at true scale, inspect the tracked excavator and review ground and access conditions.</p>
+
+            <div class="progress" id="progress" aria-live="polite">
+                <div class="bar"><span id="progress-fill"></span></div>
+                <div class="progress-row"><span id="progress-label">Preparing site survey…</span><span id="progress-pct">0%</span></div>
+            </div>
+
+            <button id="enter" class="enter" disabled>
+                <span class="enter-label">Enter Site</span>
+                <span class="enter-sub" id="enter-sub">Loading…</span>
+            </button>
+            <p class="mode-note" id="mode-note"></p>
+        </div>
+
+        <footer class="foot">
+            <button class="link" id="open-settings">Comfort settings</button>
+            <span class="dot"></span>
+            <button class="link" id="open-credits">Credits</button>
+        </footer>
+    </section>
+
+    <!-- Desktop walkthrough HUD (hidden in VR; the headset shows the in-VR menu instead) -->
+    <section id="hud" class="hud" hidden>
+        <div class="hud-top">
+            <span class="hud-brand">SiteXR</span>
+            <div class="hud-actions">
+                <button id="hud-tour" class="hud-btn">Guided tour</button>
+                <button id="hud-reset" class="hud-btn">Reset position</button>
+                <button id="hud-menu" class="hud-btn">Menu</button>
+            </div>
+        </div>
+        <div class="hud-hint" id="hud-hint">Drag to look · click the ground to walk there · W A S D to move · click a numbered marker</div>
+        <div class="caption" id="caption" hidden>
+            <div class="caption-head"><span id="caption-step"></span><span id="caption-title"></span></div>
+            <p id="caption-text"></p>
+            <div class="caption-actions">
+                <button id="caption-prev" class="hud-btn small">Back</button>
+                <button id="caption-next" class="hud-btn small primary">Next</button>
+                <button id="caption-stop" class="hud-btn small">End tour</button>
+            </div>
+        </div>
+        <div class="poi" id="poi" hidden>
+            <div class="poi-head"><span class="poi-badge" id="poi-index">1</span><span id="poi-title"></span></div>
+            <p id="poi-text"></p>
+            <div class="caption-actions">
+                <button id="poi-go" class="hud-btn small primary">Go there</button>
+                <button id="poi-close" class="hud-btn small">Close</button>
+            </div>
+        </div>
+    </section>
+
+    <div id="fade" class="fade"></div>
+
+    <!-- Modals -->
+    <div id="modal-settings" class="modal" hidden>
+        <div class="modal-card">
+            <h2>Comfort settings</h2>
+            <div class="rows" id="settings-rows"></div>
+            <p class="muted">Quality changes the splat budget immediately; the VR render resolution applies on the next VR entry.</p>
+            <div class="modal-actions"><button class="hud-btn" id="settings-defaults">Defaults</button><button class="hud-btn primary" data-close>Done</button></div>
+        </div>
+    </div>
+
+    <div id="modal-credits" class="modal" hidden>
+        <div class="modal-card">
+            <h2>Credits</h2>
+            <p><strong>Scene</strong><br />“Muddy Excavator Site” by dok11 — licensed <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>. Source: <a href="https://superspl.at/scene/ded12920" target="_blank" rel="noopener">original scene</a>.<br /><span class="muted">Changes: converted to a multi-level-of-detail streaming format, spherical harmonics reduced to one band, voxel collision data used for navigation.</span></p>
+            <p><strong>Technology</strong><br />Rendered with the <a href="https://playcanvas.com" target="_blank" rel="noopener">PlayCanvas engine</a> and the open-source SuperSplat viewer runtime (MIT). Controller models from the WebXR Input Profiles project (Apache-2.0).</p>
+            <p><strong>Controls</strong><br />VR: left stick walk · right stick turn · trigger teleport · B menu · Y reset · X tour · A/trigger select.<br />Desktop: drag to look · click the ground to walk · W A S D · R reset · T tour · M menu.</p>
+            <div class="modal-actions"><button class="hud-btn primary" data-close>Close</button></div>
+        </div>
+    </div>
+
+    <div id="toast" class="toast" hidden></div>
+
+    <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

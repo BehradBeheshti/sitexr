@@ -1,0 +1,31 @@
+{
+  "name": "sitexr",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "SiteXR — Immersive Construction Review (Meta Quest 3 WebXR)",
+  "scripts": {
+    "dev": "vite --host",
+    "dev:https": "vite --host --config vite.https.config.js",
+    "build": "vite build",
+    "preview": "vite preview --host",
+    "test": "npm run build && node tools/smoke-test.mjs",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "assets": "bash tools/build-scene.sh",
+    "controllers": "node tools/sync-controller-profiles.mjs"
+  },
+  "dependencies": {
+    "playcanvas": "^2.22.1"
+  },
+  "devDependencies": {
+    "@playcanvas/splat-transform": "^3.4.2",
+    "@vitejs/plugin-basic-ssl": "^2.3.0",
+    "@webxr-input-profiles/assets": "^1.0.20",
+    "puppeteer-core": "^25.11.0",
+    "typescript": "^5.9.3",
+    "vite": "^7.1.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

@@ -1,0 +1,8 @@
+# Cloudflare Pages caching. Vite's hashed /assets are immutable; scene chunks keep their
+# names between rebuilds, so they get a day.
+/scene/*
+  Cache-Control: public, max-age=86400
+/controllers/*
+  Cache-Control: public, max-age=86400
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
