@@ -193,10 +193,59 @@ src/xr/tour.ts              guided tour state machine
 src/xr/tutorial.ts          first-time controller tutorial
 src/vendor/supersplat-viewer  vendored viewer runtime (MIT; see VENDORED.md for the patches)
 tools/                      asset pipeline, navigation grids, viewpoint survey, video
-                            recorder, smoke test
+                            recorder, desktop smoke test, emulated-VR session test
 ```
 
+## First run on a Quest 3
+
+1. Put the headset on and open **https://behradbeheshti.github.io/sitexr/** in the Meta
+   Quest Browser. Nothing to install, no sideloading, no developer mode.
+2. Pick a site from the three cards, wait for *Site ready*, and press **Enter Site**. The
+   headset asks once for permission to enter immersive mode; accept it.
+3. A five-step controller tutorial runs the first time. Each step completes when you
+   actually perform the input, so it doubles as a controller check. *Skip tutorial* is
+   there if you have done it before.
+4. Then: left stick to walk, right stick to turn, trigger to teleport, **B** for the menu,
+   **Y** to reset, **X** for the guided tour. Point at a numbered marker and pull the
+   trigger to read its note.
+
+If something feels wrong, the menu's *Comfort settings* has turning mode, walk speed, the
+movement vignette, teleport on/off and three quality tiers. Quality *Low* is the safest if
+the frame rate drops.
+
 ## Verification
+
+Two suites, both headless, both runnable without a headset:
+
+```sh
+npm run test        # build + desktop suite
+npm run test:vr     # one emulated VR session (add a site id)
+npm run test:all    # build + desktop suite + VR session on each of the three sites
+```
+
+### Emulated VR
+
+`tools/xr-test.mjs` runs a complete immersive session against a synthetic Meta Quest 3,
+using the [IWER](https://github.com/meta-quest/immersive-web-emulation-runtime) runtime
+injected before the app loads. It is what exercises the code a headset would run: session
+start, spawn placement, terrain following, thumbstick walking, snap and smooth turning,
+the teleport arc and its landing validation, controller rays hitting the in-VR panels, the
+tutorial, the menu, reset, the guided tour, marker cards, room-scale head movement and
+exit. Twenty-six checks per site; screenshots of the headset view land in
+`test-output/xr/<siteId>/`.
+
+It aims the controllers the way a person does — closing the loop on the reported pointer
+ray, and steepening the throw until the ballistic teleport arc lands — so it catches
+aiming and coordinate-space faults rather than asserting on internals. `src/xr/rig.ts`
+exposes three small `debug*` methods for it; they are the only test hooks in the shipped
+source.
+
+What it cannot check: real frame rate, comfort, tracking quality and the headset's own
+permission prompt. The engine clamps delta time per frame and this renders in software at
+a few frames a second, so distances move at the right *direction* but not the right
+*speed*; the suite asserts accordingly.
+
+### Desktop
 
 `npm run test` builds and runs `tools/smoke-test.mjs` in headless Chrome: the scene loads
 from the self-hosted build, no runtime console errors, no iframe, no SuperSplat/localhost

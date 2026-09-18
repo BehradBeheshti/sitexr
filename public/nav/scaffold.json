@@ -1,1 +1,1 @@
-{"version": 1, "cell": 0.15, "width": 160, "height": 160, "origin": [-12.0, -12.0], "scale": 0.75, "seed": [2.0, 0.0], "layers": ["floor:f32", "ceiling:f32", "walk:u8"]}
+{"version": 2, "cell": 0.15, "width": 160, "height": 160, "origin": [-12.0, -12.0], "scale": 0.75, "seed": [2.0, 0.0], "layers": ["floor:f32", "ceiling:f32", "walk:u8", "obstacle:u8"]}

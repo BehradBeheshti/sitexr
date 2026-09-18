@@ -172,11 +172,17 @@ if r > 0:
     walk = er
 print(f'walkable cells {int(walk.sum())} of {W*H} ({walk.sum()*cell*cell*S*S:.0f} m²)')
 
-meta = {'version': 1, 'cell': cell, 'width': W, 'height': H, 'origin': [xmin, zmin], 'scale': S,
-        'seed': [sx, sz], 'layers': ['floor:f32', 'ceiling:f32', 'walk:u8']}
+# Two masks, deliberately different:
+#   walk     - flood-filled from the seed and eroded by --margin: where a visitor may LAND
+#              (spawn, teleport, "go there"). Conservative on purpose.
+#   obstacle - cells with geometry in the standing band: what actually BLOCKS movement and
+#              the teleport arc. Not eroded, so the margin never becomes an invisible wall.
+meta = {'version': 2, 'cell': cell, 'width': W, 'height': H, 'origin': [xmin, zmin], 'scale': S,
+        'seed': [sx, sz], 'layers': ['floor:f32', 'ceiling:f32', 'walk:u8', 'obstacle:u8']}
 json.dump(meta, open(a.out + '.json', 'w'))
 with open(a.out + '.bin', 'wb') as fh:
-    fh.write(floor.astype('<f4').tobytes()); fh.write(ceiling.astype('<f4').tobytes()); fh.write(walk.tobytes())
+    fh.write(floor.astype('<f4').tobytes()); fh.write(ceiling.astype('<f4').tobytes())
+    fh.write(walk.tobytes()); fh.write(obst.tobytes())
 
 # ascii preview (every k cells)
 k = max(1, int(2.0 / S / cell))

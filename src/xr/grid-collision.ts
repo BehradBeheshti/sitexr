@@ -13,6 +13,17 @@ type NavMeta = {
     scale: number;
 };
 
+/**
+ * The grid carries two masks and they mean different things.
+ *
+ * `walk` is the flood-filled region, eroded by a keep-out margin: where a visitor may be
+ * *placed* — spawn, teleport landing, "go there". It is deliberately conservative.
+ *
+ * `obstacle` is where geometry actually stands in the standing band. Only these cells
+ * block movement and stop the teleport arc. Treating the eroded margin as solid would
+ * ring every open space with invisible walls, which is what an earlier version did.
+ */
+
 const EPS = 1e-4;
 
 export class GridCollision implements Collision {
@@ -25,6 +36,8 @@ export class GridCollision implements Collision {
     private ceiling: Float32Array;
 
     private walk: Uint8Array;
+
+    private obstacle: Uint8Array;
 
     private cellM: number;
 
@@ -39,6 +52,12 @@ export class GridCollision implements Collision {
         this.floor = new Float32Array(bin, 0, n);
         this.ceiling = new Float32Array(bin, n * 4, n);
         this.walk = new Uint8Array(bin, n * 8, n);
+        // version 1 grids have no obstacle layer: fall back to "not walkable blocks",
+        // which is the old, over-eager behaviour but keeps such a grid loadable
+        this.obstacle =
+            bin.byteLength >= n * 10
+                ? new Uint8Array(bin, n * 9, n)
+                : Uint8Array.from(this.walk, (w) => (w ? 0 : 1));
         this.S = meta.scale;
         this.cellM = meta.cell * meta.scale;
         this.voxelResolution = this.cellM;
@@ -86,9 +105,19 @@ export class GridCollision implements Collision {
         return wsum > 0.05 ? (sum / wsum) * this.S : NaN;
     }
 
+    /** May a visitor be placed here? Conservative: flood-filled and eroded. */
     walkableAt(x: number, z: number): boolean {
         const i = this.cellIndex(x, z);
         return i >= 0 && this.walk[i] === 1;
+    }
+
+    /** Does geometry stand here? This is what blocks movement and the teleport arc. */
+    blockedAt(x: number, z: number): boolean {
+        const i = this.cellIndex(x, z);
+        if (i < 0) return true;
+        if (this.obstacle[i] === 1) return true;
+        // unmapped ground is treated as solid, so a visitor cannot walk off the survey
+        return Number.isNaN(this.floor[i]);
     }
 
     private ceilingAt(x: number, z: number): number {
@@ -98,12 +127,12 @@ export class GridCollision implements Collision {
         return Number.isNaN(v) ? NaN : v * this.S;
     }
 
-    /** True when the point is inside solid: below the floor, or in a blocked cell's wall band. */
+    /** True when the point is inside solid: below the floor, or in an obstacle's wall band. */
     private solidAt(x: number, y: number, z: number): boolean {
         const f = this.floorAt(x, z);
         if (Number.isNaN(f)) return true;
         if (y <= f) return true;
-        if (!this.walkableAt(x, z) && y < f + this.wallHeight) return true;
+        if (this.blockedAt(x, z) && y < f + this.wallHeight) return true;
         const c = this.ceilingAt(x, z);
         return !Number.isNaN(c) && y >= c;
     }
@@ -130,7 +159,7 @@ export class GridCollision implements Collision {
             }
             const c = this.ceilingAt(ox, oz);
             if (!Number.isNaN(c) && c >= oy && c - oy <= maxDist) return { x: ox, y: c, z: oz };
-            if (!this.walkableAt(ox, oz) && !Number.isNaN(f) && oy < f + this.wallHeight) return { x: ox, y: oy, z: oz };
+            if (this.blockedAt(ox, oz) && !Number.isNaN(f) && oy < f + this.wallHeight) return { x: ox, y: oy, z: oz };
             return null;
         }
         // Oblique rays (teleport arc segments): march in small steps.
@@ -147,7 +176,7 @@ export class GridCollision implements Collision {
             if (this.solidAt(px, py, pz)) {
                 const f = this.floorAt(px, pz);
                 // snap a ground hit onto the floor surface
-                if (!Number.isNaN(f) && py <= f + 0.02 && this.walkableAt(px, pz)) return { x: px, y: f, z: pz };
+                if (!Number.isNaN(f) && py <= f + 0.05 && !this.blockedAt(px, pz)) return { x: px, y: f, z: pz };
                 return { x: px, y: py, z: pz };
             }
         }
@@ -182,12 +211,15 @@ export class GridCollision implements Collision {
         for (let zi = z0; zi <= z1; zi++) {
             for (let xi = x0; xi <= x1; xi++) {
                 const inside = xi >= 0 && zi >= 0 && xi < width && zi < height;
-                if (inside && this.walk[zi * width + xi] === 1) continue;
+                // only real geometry pushes the visitor back, never the landing margin
+                if (inside && this.obstacle[zi * width + xi] !== 1 && !Number.isNaN(this.floor[zi * width + xi])) {
+                    continue;
+                }
                 // the cell's wall band must overlap the capsule vertically
                 if (inside) {
                     const cf = this.floor[zi * width + xi];
                     if (!Number.isNaN(cf)) {
-                        const wallTop = (cf + this.wallHeight / this.S) * this.S;
+                        const wallTop = cf * this.S + this.wallHeight;
                         if (bottom > wallTop) continue;
                     }
                 }

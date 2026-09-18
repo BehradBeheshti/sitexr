@@ -77,7 +77,7 @@ export class XrRig {
     locked = false;
 
     /** Ground under the head on the last valid frame; the teleport arc and reset use it. */
-    private lastSafe = { x: 0, z: 0, ground: 0, valid: false };
+    lastSafe = { x: 0, z: 0, ground: 0, valid: false };
 
     private hands = new Map<XrInputSource, HandState>();
 
@@ -97,9 +97,9 @@ export class XrRig {
 
     private xrFrames = 0;
 
-    private settleFrames = 0;
+    settleFrames = 0;
 
-    private lastGround: number | null = null;
+    lastGround: number | null = null;
 
     private laserMat: StandardMaterial;
 
@@ -263,7 +263,7 @@ export class XrRig {
         return new Vec3(x, g, z);
     }
 
-    private probeGround(x: number, z: number, floorY: number): number | null {
+    probeGround(x: number, z: number, floorY: number): number | null {
         if (!this.collision) return 0;
         const r = 0.22;
         const fromY = floorY + 1.05;
@@ -413,6 +413,54 @@ export class XrRig {
         }
     }
 
+    /** Locomotion state, for the emulated-VR test harness. */
+    debugWalk() {
+        const head = this.camera.getPosition();
+        const rig = this.rig.getPosition();
+        return {
+            head: [+head.x.toFixed(2), +head.y.toFixed(2), +head.z.toFixed(2)],
+            floorY: +rig.y.toFixed(2),
+            ground: this.probeGround(head.x, head.z, rig.y),
+            groundRay: this.groundAt(head.x, head.z),
+            lastSafe: { ...this.lastSafe },
+            lastGround: this.lastGround,
+            settle: this.settleFrames,
+            locked: this.locked,
+            inSite: Math.hypot(head.x, head.z) <= this.walkRadius
+        };
+    }
+
+    /** Why a teleport target was accepted or rejected, for the test harness. */
+    debugTeleport(from: Vec3, to: Vec3) {
+        if (!this.collision) return { reason: 'no collision' };
+        const dir = new Vec3().sub2(to, from);
+        const len = dir.length();
+        dir.mulScalar(1 / len);
+        const hit = this.collision.queryRay(from.x, from.y, from.z, dir.x, dir.y, dir.z, len);
+        if (!hit) return { reason: 'no hit' };
+        const n = this.collision.querySurfaceNormal(hit.x, hit.y, hit.z, dir.x, dir.y, dir.z);
+        return {
+            hit: [+hit.x.toFixed(2), +hit.y.toFixed(2), +hit.z.toFixed(2)],
+            inSite: Math.hypot(hit.x, hit.z) <= this.walkRadius,
+            normalY: +n.ny.toFixed(2),
+            headroom: !this.collision.queryRay(hit.x, hit.y + 0.3, hit.z, 0, 1, 0, 1.6),
+            free: this.collision.isFreeAt(hit.x, hit.y + 0.9, hit.z)
+        };
+    }
+
+    /** Per-hand pointer and button state, for the emulated-VR test harness. */
+    debugState() {
+        return [...this.hands.values()].map((h) => ({
+            hand: h.source.handedness,
+            hit: h.hit ? { u: +h.hit.u.toFixed(3), v: +h.hit.v.toFixed(3), dist: +h.hit.dist.toFixed(2), name: h.hit.target.entity.name } : null,
+            buttons: Array.from(h.source.gamepad?.buttons ?? [], (b) => (b?.pressed ? 1 : 0)).join(''),
+            axes: Array.from(h.source.gamepad?.axes ?? [], (a) => Number(a).toFixed(2)).join(','),
+            // the pointer ray as the viewer sees it, so a test can close the loop on aiming
+            origin: [h.source.getOrigin().x, h.source.getOrigin().y, h.source.getOrigin().z],
+            dir: [h.source.getDirection().x, h.source.getDirection().y, h.source.getDirection().z]
+        }));
+    }
+
     /** True while any controller ray hovers a SiteXR surface. */
     get pointingAtUi() {
         for (const h of this.hands.values()) if (h.hit) return true;
@@ -449,7 +497,7 @@ export class XrRig {
             const gp = source.gamepad;
             if (gp) {
                 for (let i = 0; i < gp.buttons.length; i++) {
-                    const p = gp.buttons[i].pressed;
+                    const p = !!gp.buttons[i]?.pressed;
                     if (p && !h.pressed[i]) this.onButtonDown(h, i);
                     h.pressed[i] = p;
                 }
