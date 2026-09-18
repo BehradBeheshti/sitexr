@@ -308,57 +308,57 @@ const scaffold: Site = {
 const officeInterior: Site = {
     id: 'office',
     kind: 'design',
-    name: 'Office Furniture Layout',
-    subtitle: 'Revit model · FF&E layout at full size',
-    blurb: 'Walk an office furniture layout at full size: desks, chairs and clearances exactly where the model puts them.',
+    name: 'Office Interior',
+    subtitle: 'Revit model · 10.5 × 5.9 m room · walk inside it',
+    blurb: 'Walk inside an office as modelled: walls, floor, desks and clearances at the sizes the drawing gives them.',
     tag: 'Revit model',
     poster: 'brand/poster-office.webp',
     model: { url: 'bim/office-interior.glb' },
     collision: { type: 'mesh', url: 'bim/office-interior.glb' },
     worldScale: 1,
-    spawn: { x: 2.2, z: -2.2, floor: -0.69, look: [0, 0.2, 0.2] },
+    spawn: { x: 2.4, z: 1.8, floor: 0, look: [-6.0, 1.5, 1.8] },
     walkRadius: 12,
     background: [0.72, 0.75, 0.79],
     pois: [
         {
             id: 'desks',
             index: 1,
-            title: 'Desk cluster',
+            title: 'Desk layout',
             text: 'Desks and task chairs where the model places them. Standing among them is the quickest way to judge whether the spacing works for the people who will use it.',
-            marker: [0, 0.9, 0.2],
-            stand: { x: 1.8, z: -1.2, look: [0, 0.3, 0.2] }
+            marker: [-2.0, 1.3, 1.8],
+            stand: { x: 0.6, z: 1.8, look: [-2.0, 0.9, 1.8] }
         },
         {
-            id: 'clearance',
+            id: 'walls',
             index: 2,
-            title: 'Circulation clearance',
-            text: 'The gap between furniture runs. A gangway that reads as generous on a plan often does not once you are walking it at full size.',
-            marker: [-2.0, 0.9, 1.2],
-            stand: { x: -0.4, z: -0.8, look: [-2.0, 0.3, 1.2] }
+            title: 'Walls & openings',
+            text: 'Generic 200 mm partitions with their openings as drawn. On review these are checked against the room data sheet, and later against what was actually built.',
+            marker: [-6.6, 1.8, 1.8],
+            stand: { x: -3.6, z: 1.8, look: [-6.8, 1.6, 1.8] }
         },
         {
-            id: 'display',
+            id: 'height',
             index: 3,
-            title: 'Wall-mounted display',
-            text: 'A screen at its modelled mounting height. Sight lines to a display are worth checking from the seats that will actually face it.',
-            marker: [-1.9, 3.15, 0.6],
-            stand: { x: 0.8, z: 0.4, look: [-1.9, 3.0, 0.6] }
+            title: 'Ceiling height',
+            text: 'Floor to soffit is 3.66 m here. Height is the hardest dimension to judge from a drawing and the easiest to judge standing under it.',
+            marker: [-1.8, 3.4, 3.4],
+            stand: { x: -1.8, z: 3.4, look: [-1.8, 3.5, 2.0] }
         }
     ],
     tour: [
-        { title: 'Arrival', text: 'A design model, not a capture: this is the furniture layout as drawn, at full size.', x: 2.2, z: -2.2, look: [0, 0.2, 0.2], dwell: 9 },
-        { title: 'Desk cluster', text: 'Desks and chairs where the model puts them. Judge the spacing by standing in it.', x: 1.8, z: -1.2, look: [0, 0.3, 0.2], dwell: 10 },
-        { title: 'Circulation', text: 'The gangway between furniture runs, at the width the model gives it.', x: -0.4, z: -0.8, look: [-2.0, 0.3, 1.2], dwell: 10 },
-        { title: 'Display', text: 'A wall-mounted screen at its modelled height. Check the sight line from the seats.', x: 0.8, z: 0.4, look: [-1.9, 3.0, 0.6], dwell: 9 },
-        { title: 'End of tour', text: 'Back at the arrival point. Explore the layout, or press B for the menu.', x: 2.2, z: -2.2, look: [0, 0.2, 0.2], dwell: 6 }
+        { title: 'Arrival', text: 'A design model, not a capture: this is the room as drawn, at full size.', x: 2.4, z: 1.8, look: [-6.0, 1.5, 1.8], dwell: 9 },
+        { title: 'Desk layout', text: 'Desks and chairs at their modelled positions. Judge the spacing by standing in it.', x: 0.6, z: 1.8, look: [-2.0, 0.9, 1.8], dwell: 10 },
+        { title: 'Walls', text: 'Partitions and openings as drawn, at the thickness the model gives them.', x: -3.6, z: 1.8, look: [-6.8, 1.6, 1.8], dwell: 10 },
+        { title: 'Ceiling', text: 'Floor to soffit: the dimension that is hardest to judge on paper.', x: -1.8, z: 3.4, look: [-1.8, 3.5, 2.0], dwell: 9 },
+        { title: 'End of tour', text: 'Back at the arrival point. Explore the room, or press B for the menu.', x: 2.4, z: 1.8, look: [-6.0, 1.5, 1.8], dwell: 6 }
     ],
     credits: {
-        sceneTitle: 'Office furniture layout (Revit model)',
+        sceneTitle: 'Office interior (Revit model)',
         sceneAuthor: 'supplied by the project',
         sceneLicense: 'not for redistribution',
         sceneLicenseUrl: '',
         sceneSourceUrl: '',
-        changes: 'Exported from Revit as FBX and converted to glTF: rescaled from inches to metres, node transforms baked in, meshes merged, materials made double-sided and a floor plane added. The export carried the furniture only, not the building shell.'
+        changes: 'Exported from Revit as FBX, read with assimp, rescaled from feet to metres, rotated from Z-up, node transforms baked in, meshes merged and materials made double-sided so the walls are visible from inside.'
     }
 };
 

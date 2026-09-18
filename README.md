@@ -137,7 +137,7 @@ of them needing the authoring application:
 | From | With | Notes |
 | --- | --- | --- |
 | **IFC** | `tools/ifc-to-glb.py` (IfcOpenShell) | the best input: keeps structure and material colours |
-| **FBX** | [FBX2glTF](https://github.com/facebookincubator/FBX2glTF) | what Revit exports directly; check the export actually carried the walls |
+| **FBX** | `tools/fbx-to-glb.py` (assimp) | what Revit exports directly |
 | **SketchUp** | `tools/skp-to-glb.py` (OpenSKP) | no Trimble SDK needed; writes millimetres |
 
 Every route then goes through the same second step, which is not optional:
@@ -162,6 +162,16 @@ The mesh is its own collision surface: walls stop you, floors carry you, the tel
 lands on them. `src/xr/model-collision.ts` reads the triangles off the instantiated entity
 rather than downloading the glb twice — the engine caches by url, so a second asset's
 unload would destroy the geometry the first is drawing.
+
+### A warning about FBX converters
+
+Revit FBX exports carry their up-axis and unit scale on the nodes, and instanced furniture
+shares one mesh between many nodes. Get either wrong and you still get a model — just not
+the right one. Facebook's FBX2glTF, the obvious tool, warns about `eInheritRrSs` transform
+inheritance on Revit files and then produces geometry whose walls collapse to fragments:
+an 8 × 8 m room reduced to 9 m² of total surface, which looks like furniture floating in
+space. assimp reads the same file correctly. If a converted model looks sparse, measure its
+surface area before believing it.
 
 ### What does not convert
 

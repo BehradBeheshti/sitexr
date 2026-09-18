@@ -23,27 +23,44 @@ const doc = await io.read(src);
 
 const before = doc.getRoot().listMeshes().length;
 
-// Bake every node's world transform into its mesh. The IFC converter expresses the
-// Z-up to Y-up change as a rotation on each node, and nothing downstream (least of all
-// the collision loader, which reads vertex buffers directly) applies node transforms.
-const seen = new Map();
-for (const node of doc.getRoot().listNodes()) {
+// Bake every node's world transform into its mesh.
+//
+// Two traps here, both of which produce a model that looks plausible and is wrong:
+//   - a mesh reached from several nodes (instanced furniture) must be copied BEFORE any
+//     transform is applied, or the second instance is transformed twice;
+//   - every world matrix must be read before any matrix is cleared, since clearing a
+//     parent's would silently change its children's.
+const nodes = doc.getRoot().listNodes();
+
+const worldMatrices = new Map();
+for (const node of nodes) {
+    if (node.getMesh()) worldMatrices.set(node, node.getWorldMatrix());
+}
+
+const uses = new Map();
+for (const node of nodes) {
+    const mesh = node.getMesh();
+    if (mesh) uses.set(mesh, (uses.get(mesh) ?? 0) + 1);
+}
+for (const node of nodes) {
+    const mesh = node.getMesh();
+    if (mesh && uses.get(mesh) > 1) node.setMesh(mesh.clone());
+}
+
+const IDENTITY = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
+for (const node of nodes) {
     const mesh = node.getMesh();
     if (!mesh) continue;
-    const matrix = node.getWorldMatrix();
-    // a mesh reached from two nodes needs a copy, or the transform lands on it twice
-    let target = mesh;
-    if (seen.has(mesh)) {
-        target = mesh.clone();
-        node.setMesh(target);
-    }
-    seen.set(target, true);
-    transformMesh(target, matrix);
-    node.setMatrix([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
+    transformMesh(mesh, worldMatrices.get(node));
 }
-// parents may still carry a transform; clear the whole graph now that it is baked
-for (const node of doc.getRoot().listNodes()) {
-    node.setMatrix([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
+for (const node of nodes) node.setMatrix(IDENTITY);
+
+// Z-up sources (IFC, Revit, most FBX) need the axes swapped for a Y-up runtime.
+if (process.argv.includes('--z-up')) {
+    // -90 degrees about X: y' = z, z' = -y, stored column-major as glTF wants
+    const R = [1, 0, 0, 0, 0, 0, -1, 0, 0, 1, 0, 0, 0, 0, 0, 1];
+    for (const mesh of doc.getRoot().listMeshes()) transformMesh(mesh, R);
+    console.log('rotated Z-up to Y-up');
 }
 
 await doc.transform(dedup(), join({ keepNamed: false }), weld(), prune());
