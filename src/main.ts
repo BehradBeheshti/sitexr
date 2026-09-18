@@ -1,7 +1,7 @@
 // SiteXR — Immersive Construction Review. Bootstraps the splat viewer for the chosen site,
 // decides between immersive VR and the desktop walkthrough, and wires the SiteXR layer.
 import { Vec3, platform } from 'playcanvas';
-import type { Entity } from 'playcanvas';
+import type { Entity, GSplatComponent } from 'playcanvas';
 
 import { ASSETS, DEFAULT_SITE, EYE_HEIGHT, MODES, SITES, defaultSiteOf, modeOf, viewerSettings } from './config';
 import type { ModeId, Poi, Site, TourStop } from './config';
@@ -219,8 +219,28 @@ const main = async () => {
 
         const layer = getUiLayer(app, camera);
 
+        // The splat component, once it exists; not awaited, so a large scene does not hold
+        // up the rest of the setup.
+        let gsplatComponent: GSplatComponent | null = null;
+        internals.gsplat
+            .then((entity) => {
+                gsplatComponent = (entity?.gsplat as GSplatComponent | undefined) ?? null;
+            })
+            .catch(() => {
+                gsplatComponent = null;
+            });
+
         // Holds the headset's frame rate by trading splat detail for smoothness.
-        const governor = new PerformanceGovernor(app, budgetFor, () => FOVEATION[settings.get().quality]);
+        const governor = new PerformanceGovernor(
+            app,
+            budgetFor,
+            () => FOVEATION[settings.get().quality],
+            () => gsplatComponent
+        );
+
+        // ?nogov pins the budget to the chosen tier, for judging quality without the
+        // governor trimming it; a diagnostic, not something a visitor should need
+        if (params.has('nogov')) governor.enabled = false;
 
         // ?fps shows a frame-rate readout in the headset; it is a diagnostic, not a feature
         if (params.has('fps')) {

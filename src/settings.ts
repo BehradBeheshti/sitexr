@@ -17,18 +17,14 @@ export type Comfort = {
 
 const KEY = 'sitexr.comfort.v1';
 
-/** True for a standalone headset browser, where the performance budget is much tighter. */
-const onHeadset = () =>
-    typeof navigator !== 'undefined' && /OculusBrowser|Quest|Pico|PICO|Wolvic/i.test(navigator.userAgent);
-
 const DEFAULTS: Comfort = {
     turn: 'snap30',
     speed: 'normal',
     vignette: true,
     teleport: true,
-    // A headset starts on the safe tier: a smooth first minute matters more than detail,
-    // and Comfort settings is one button press away for anyone who wants more.
-    quality: onHeadset() ? 'low' : 'balanced',
+    // The governor protects the frame rate, so a headset can start at the middle tier and
+    // be trimmed if the device cannot hold it, rather than starting soft and looking it.
+    quality: 'balanced',
     tutorialDone: false
 };
 
@@ -43,9 +39,9 @@ export const SPEEDS: Record<Speed, number> = { slow: 1.1, normal: 1.6, fast: 2.4
  * the performance governor lowers the figure further whenever frames run long.
  */
 export const BUDGETS: Record<Quality, { headset: number; desktop: number }> = {
-    low: { headset: 0.2, desktop: 1.5 },
-    balanced: { headset: 0.35, desktop: 2.5 },
-    high: { headset: 0.6, desktop: 4 }
+    low: { headset: 0.35, desktop: 1.5 },
+    balanced: { headset: 0.7, desktop: 2.5 },
+    high: { headset: 1.2, desktop: 4 }
 };
 
 /**
@@ -53,13 +49,22 @@ export const BUDGETS: Record<Quality, { headset: number; desktop: number }> = {
  * allows it to be chosen when the session starts. A Quest 3's native eye buffer is large
  * enough that 0.7 still reads sharply while costing half the fill.
  */
-export const FRAMEBUFFER_SCALE: Record<Quality, number> = { low: 0.55, balanced: 0.7, high: 0.85 };
+export const FRAMEBUFFER_SCALE: Record<Quality, number> = { low: 0.8, balanced: 0.9, high: 1.0 };
 
 /**
  * Fixed foveation per quality tier: resolution is dropped at the edge of the lens, away
  * from where the eye is pointed. Raised further while the governor is limiting detail.
+ * Kept modest, because too much of it reads as smeared peripheral vision.
  */
-export const FOVEATION: Record<Quality, number> = { low: 0.9, balanced: 0.7, high: 0.5 };
+/**
+ * How sharply splat detail falls off with distance, as an exponent on projected coverage:
+ * 1 is neutral, 2 concentrates the budget near the camera. Walking a site means the near
+ * field is what you are actually looking at, so a limited budget is better spent there
+ * than spread evenly over ground you are nowhere near.
+ */
+export const LOD_FALLOFF = 2;
+
+export const FOVEATION: Record<Quality, number> = { low: 0.6, balanced: 0.4, high: 0.25 };
 
 class SettingsStore {
     readonly events = new EventHandler();

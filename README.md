@@ -284,12 +284,20 @@ Three mechanisms keep it smooth:
 The framebuffer scale is the one knob that cannot be changed mid-session: WebXR only
 allows it to be chosen when the session starts, so it comes from the quality tier.
 
-A headset defaults to the *Low* tier. A smooth first minute matters more than detail, and
-the tier is one button press away in the menu.
+Detail is also **concentrated near the camera** in VR (`lodFalloff`). Walking a site means
+the near field is what you are actually looking at, so a limited budget is better spent
+there than spread evenly over ground you are nowhere near. It is the change that buys the
+most apparent sharpness per frame.
 
-Add **`?fps`** to the url for a frame-rate readout inside the headset, showing the current
-rate, the lowest seen, the splat budget in force (with an arrow when the governor is
-limiting) and the foveation level. The Quest renders both eyes at 72 Hz,
+A headset starts on *Balanced*. The governor trims from there if the device cannot hold it,
+which is a better trade than starting soft and looking it.
+
+Two url flags help when judging this on a real headset:
+
+| Flag | Effect |
+| --- | --- |
+| `?fps` | frame-rate readout in the headset: current rate, lowest seen, the budget in force with an arrow when the governor is limiting, and the foveation level |
+| `?nogov` | pins the budget to the chosen tier, so quality can be judged without the governor trimming it | The Quest renders both eyes at 72 Hz,
 so anything sitting below about 68 is worth reporting. Changing quality resets the low
 reading, which makes the three tiers easy to compare.
 

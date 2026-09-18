@@ -7,7 +7,9 @@
 //
 // The governor never exceeds what the visitor asked for in Comfort settings. It only ever
 // takes detail away to keep motion smooth, and gives it back when there is headroom.
-import type { AppBase } from 'playcanvas';
+import type { AppBase, GSplatComponent } from 'playcanvas';
+
+import { LOD_FALLOFF } from '../settings';
 
 /** Frame time we aim to stay under, in milliseconds (72 Hz with a little slack). */
 const TARGET_MS = 14.5;
@@ -16,10 +18,10 @@ const SLOW_MS = 16.5;
 /** Below this, and only after a settled period, detail goes back up. */
 const FAST_MS = 11.5;
 
-const DOWN_FACTOR = 0.72;
+const DOWN_FACTOR = 0.8;
 const UP_FACTOR = 1.18;
 /** Never go below this many splats, however slow the device. */
-const FLOOR_M = 0.1;
+const FLOOR_M = 0.15;
 /** Fraction of the requested budget to enter a session with, before climbing. */
 const START_FRACTION = 0.6;
 
@@ -57,10 +59,23 @@ export class PerformanceGovernor {
 
     private prevColorAngle = 0.2;
 
-    constructor(app: AppBase, targetBudget: () => number, baseFoveation: () => number) {
+    private gsplat: () => GSplatComponent | null;
+
+    private prevFalloff = 1;
+
+    /** When false the budget is pinned to the chosen tier, for judging quality directly. */
+    enabled = true;
+
+    constructor(
+        app: AppBase,
+        targetBudget: () => number,
+        baseFoveation: () => number,
+        gsplat: () => GSplatComponent | null = () => null
+    ) {
         this.app = app;
         this.targetBudget = targetBudget;
         this.baseFoveation = baseFoveation;
+        this.gsplat = gsplat;
         this.budget = targetBudget();
 
         app.xr.on('start', () => {
@@ -75,6 +90,12 @@ export class PerformanceGovernor {
             // colour accuracy for far fewer spikes, which is what "unstable" usually is.
             this.prevColorAngle = app.scene.gsplat.colorUpdateAngle;
             app.scene.gsplat.colorUpdateAngle = 2;
+            // spend the budget where the visitor is actually looking
+            const splat = this.gsplat();
+            if (splat) {
+                this.prevFalloff = splat.lodFalloff;
+                splat.lodFalloff = LOD_FALLOFF;
+            }
             this.ema = TARGET_MS;
             this.slowFor = 0;
             this.fastFor = 0;
@@ -84,6 +105,8 @@ export class PerformanceGovernor {
         app.xr.on('end', () => {
             this.active = false;
             app.scene.gsplat.colorUpdateAngle = this.prevColorAngle;
+            const splat = this.gsplat();
+            if (splat) splat.lodFalloff = this.prevFalloff;
             // hand the desktop view back its own budget
             app.scene.gsplat.splatBudget = this.targetBudget() * 1e6;
         });
@@ -129,6 +152,14 @@ export class PerformanceGovernor {
         const ms = Math.min(100, dt * 1000);
         // a long frame counts for more than a short one, so a stutter is not averaged away
         this.ema += (ms - this.ema) * (ms > this.ema ? 0.3 : 0.08);
+
+        if (!this.enabled) {
+            if (Math.abs(this.budget - this.targetBudget()) > 1e-3) {
+                this.budget = this.targetBudget();
+                this.apply();
+            }
+            return;
+        }
 
         if (this.cooldown > 0) {
             this.cooldown -= dt;
