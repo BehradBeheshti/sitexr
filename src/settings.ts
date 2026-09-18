@@ -5,10 +5,13 @@ import { EventHandler } from 'playcanvas';
 export type TurnMode = 'snap30' | 'snap45' | 'smooth';
 export type Speed = 'slow' | 'normal' | 'fast';
 export type Quality = 'low' | 'balanced' | 'high';
+/** What "forward" means on the walk stick: where you look, or where you point. */
+export type Steering = 'head' | 'controller';
 
 export type Comfort = {
     turn: TurnMode;
     speed: Speed;
+    steering: Steering;
     vignette: boolean;
     teleport: boolean;
     quality: Quality;
@@ -20,6 +23,9 @@ const KEY = 'sitexr.comfort.v1';
 const DEFAULTS: Comfort = {
     turn: 'snap30',
     speed: 'normal',
+    // Look where you want to go. The alternative, steering with the left hand, suits
+    // people who like to look around while walking somewhere else.
+    steering: 'head',
     vignette: true,
     teleport: true,
     // The governor protects the frame rate, so a headset can start at the middle tier and

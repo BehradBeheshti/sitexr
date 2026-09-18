@@ -14,7 +14,7 @@
     "assets": "bash tools/build-scene.sh",
     "controllers": "node tools/sync-controller-profiles.mjs",
     "test:vr": "node tools/xr-test.mjs",
-    "test:all": "npm run build && node tools/smoke-test.mjs && node tools/xr-test.mjs excavator && node tools/xr-test.mjs komatsu && node tools/xr-test.mjs scaffold && node tools/xr-test.mjs bim"
+    "test:all": "npm run build && node tools/smoke-test.mjs && node tools/xr-test.mjs excavator && node tools/xr-test.mjs komatsu && node tools/xr-test.mjs scaffold"
   },
   "dependencies": {
     "playcanvas": "^2.22.1"

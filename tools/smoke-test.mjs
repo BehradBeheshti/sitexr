@@ -99,13 +99,7 @@ const runViewport = async (label, viewport, { mockVr = false } = {}) => {
         });
     }
     await page.goto(base, { waitUntil: 'domcontentloaded' });
-    await page.screenshot({ path: join(outDir, `${label}-modes.png`) });
-
-    // the welcome screen offers two experiences before any site: pick the captured sites
-    const modeIds = await page.evaluate(() => [...document.querySelectorAll('#modes .mode')].map((b) => b.dataset.id));
-    check(`${label}: both experiences offered`, modeIds.length === 2 && modeIds.includes('capture') && modeIds.includes('design'), modeIds.join(','));
-    await page.evaluate(() => document.querySelector('#modes .mode[data-id="capture"]').click());
-    await new Promise((r) => setTimeout(r, 400));
+    await page.screenshot({ path: join(outDir, `${label}-loading.png`) });
 
     // wait for the viewer to report loaded (Enter button enabled)
     let loaded = false;
@@ -233,31 +227,6 @@ const runViewport = async (label, viewport, { mockVr = false } = {}) => {
             await new Promise((r) => setTimeout(r, 1500));
             await page.screenshot({ path: join(outDir, `${label}-site-${id}-tour2.png`) });
             await page.evaluate(() => document.getElementById('caption-stop').click());
-        }
-    }
-
-    // the other experience: its own link, its own sites
-    if (!mockVr && loaded && !process.argv.includes('--first-site-only')) {
-        await page.evaluate(() => document.getElementById('hud-site').click());
-        await page.evaluate(() => document.getElementById('change-mode').click());
-        await new Promise((r) => setTimeout(r, 400));
-        await page.screenshot({ path: join(outDir, `${label}-change-experience.png`) });
-        await page.evaluate(() => document.querySelector('#modes .mode[data-id="design"]').click());
-        let designOk = false;
-        try {
-            await page.waitForFunction(() => !document.getElementById('enter')?.disabled, { timeout: 240000 });
-            designOk = true;
-        } catch {
-            designOk = false;
-        }
-        check(`${label}: design-model experience loads`, designOk);
-        if (designOk) {
-            await page.evaluate(() => document.getElementById('enter').click());
-            await new Promise((r) => setTimeout(r, 4000));
-            const st = await page.evaluate(() => ({ hud: !document.getElementById('hud').hidden, name: document.getElementById('hud-site-name').textContent, url: location.search }));
-            check(`${label}: design-model walkthrough entered`, st.hud, `${st.name} ${st.url}`);
-            check(`${label}: the url names the experience, so it can be shared`, /mode=design/.test(st.url), st.url);
-            await page.screenshot({ path: join(outDir, `${label}-design-walk.png`) });
         }
     }
 

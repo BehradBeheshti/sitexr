@@ -38,6 +38,42 @@ class SiteXrNavigation extends (XrNavigation as any) {
 
     onTeleport: ((point: Vec3) => void) | null = null;
 
+    /** 'head' walks where you look; 'controller' walks where the left hand points. */
+    steering: 'head' | 'controller' = 'head';
+
+    /**
+     * The engine walks relative to the camera, which is what most people expect: push the
+     * stick and go where you are looking. Steering with the hand instead lets you walk one
+     * way while looking another, which some people much prefer on a site.
+     */
+    _handleMovement(inputSource: XrInputSource, dt: number) {
+        if (this.steering !== 'controller') {
+            super._handleMovement(inputSource, dt);
+            return;
+        }
+        const gp = inputSource.gamepad;
+        if (!gp) return;
+        const sx = gp.axes[2];
+        const sy = gp.axes[3];
+        const mag = Math.hypot(sx, sy);
+        if (mag <= this.movementThreshold) return;
+
+        const dir = inputSource.getDirection();
+        let fx = dir.x;
+        let fz = dir.z;
+        const flat = Math.hypot(fx, fz);
+        if (flat < 1e-4) return;
+        fx /= flat;
+        fz /= flat;
+        // right-hand basis with Y up: right = forward x up
+        const rx = -fz;
+        const rz = fx;
+        const nx = sx / mag;
+        const ny = sy / mag;
+        const step = this.movementSpeed * dt;
+        this.entity.translate((rx * nx - fx * ny) * step, 0, (rz * nx - fz * ny) * step);
+    }
+
     tryTeleport(inputSource: XrInputSource) {
         const rec = this._arcHits.get(inputSource);
         if (!rec?.valid) return;
@@ -473,6 +509,7 @@ export class XrRig {
     private applyComfort() {
         const c = settings.get();
         if (!this.nav) return;
+        this.nav.steering = c.steering;
         this.nav.turnMode = c.turn === 'smooth' ? 'smooth' : 'snap';
         this.nav.rotateSpeed = c.turn === 'snap45' ? 45 : 30;
         this.nav.smoothTurnSpeed = 60;

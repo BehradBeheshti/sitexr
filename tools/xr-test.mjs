@@ -75,8 +75,7 @@ await page.evaluateOnNewDocument(
     { iwer, siteId }
 );
 
-// a deep link picks the experience and the site, which is how each audience is handed
-// its own url; it also skips the chooser for the test
+// a deep link names the site directly
 await page.goto(`${base}?site=${siteId}`, { waitUntil: 'domcontentloaded' });
 await page.waitForFunction(() => !document.getElementById('enter')?.disabled, { timeout: 600000 });
 

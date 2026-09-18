@@ -173,28 +173,29 @@ export class VrMenu {
         const rows: { label: string; key: keyof Comfort; options: [string, string][] }[] = [
             { label: 'Turning', key: 'turn', options: [['snap30', 'Snap 30°'], ['snap45', 'Snap 45°'], ['smooth', 'Smooth']] },
             { label: 'Walk speed', key: 'speed', options: [['slow', 'Slow'], ['normal', 'Normal'], ['fast', 'Fast']] },
+            { label: 'Walk towards', key: 'steering', options: [['head', 'Where I look'], ['controller', 'Where I point']] },
             { label: 'Vignette when moving', key: 'vignette', options: [['true', 'On'], ['false', 'Off']] },
             { label: 'Teleport (trigger)', key: 'teleport', options: [['true', 'On'], ['false', 'Off']] },
             { label: 'Quality', key: 'quality', options: [['low', 'Low'], ['balanced', 'Balanced'], ['high', 'High']] }
         ];
-        let y = 122;
+        let y = 112;
         for (const row of rows) {
             ctx.fillStyle = THEME.muted;
-            ctx.font = `500 26px ${THEME.font}`;
+            ctx.font = `500 25px ${THEME.font}`;
             ctx.textAlign = 'left';
             ctx.textBaseline = 'alphabetic';
-            ctx.fillText(row.label, 48, y + 22);
+            ctx.fillText(row.label, 48, y + 20);
             const n = row.options.length;
             const gap = 12;
             const bw = (w - 96 - gap * (n - 1)) / n;
-            const by = y + 36;
+            const by = y + 32;
             row.options.forEach(([value, label], i) => {
                 const id = `${row.key}:${value}`;
-                const b = this.button(id, 48 + i * (bw + gap), by, bw, 68);
+                const b = this.button(id, 48 + i * (bw + gap), by, bw, 58);
                 const active = String(c[row.key]) === value;
-                drawButton(ctx, b, label, { hover: this.panel.hover === id, active, size: 27 });
+                drawButton(ctx, b, label, { hover: this.panel.hover === id, active, size: 24 });
             });
-            y += 128;
+            y += 112;
         }
         ctx.fillStyle = THEME.muted;
         ctx.font = `400 22px ${THEME.font}`;
