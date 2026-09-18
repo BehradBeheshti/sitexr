@@ -28,7 +28,10 @@ self-signed certificate that the Quest Browser will ask you to accept once.
 
 The build is a static site: `dist/` can be dropped on any HTTPS host.
 
-### GitHub Pages (configured)
+### GitHub Pages (live)
+
+**https://behradbeheshti.github.io/sitexr/** — open it in the Meta Quest Browser and press
+*Enter Site*.
 
 `.github/workflows/deploy.yml` builds and publishes `dist/` on every push to `main`.
 One-time setup in the repository: **Settings → Pages → Build and deployment → Source:

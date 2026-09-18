@@ -3,7 +3,8 @@
 // promises: no console errors, no iframe, no SuperSplat/localhost wording in the UI,
 // VR button gating, desktop + Quest-sized layouts, and the desktop walkthrough entry.
 //
-//   npm run build && node tools/smoke-test.mjs [--headed] [--keep]
+//   npm run build && node tools/smoke-test.mjs [--headed] [--verbose]
+//   node tools/smoke-test.mjs --url https://example.com/sitexr/   (test a deployed site)
 import { spawn } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
 import { createServer } from 'node:http';
@@ -38,9 +39,16 @@ const server = createServer(async (req, res) => {
         res.end();
     }
 });
-await new Promise((r) => server.listen(0, '127.0.0.1', r));
-const port = server.address().port;
-const base = `http://127.0.0.1:${port}/`;
+const urlArg = process.argv.indexOf('--url');
+let base;
+if (urlArg !== -1) {
+    base = process.argv[urlArg + 1];
+    if (!base.endsWith('/')) base += '/';
+} else {
+    await new Promise((r) => server.listen(0, '127.0.0.1', r));
+    base = `http://127.0.0.1:${server.address().port}/`;
+}
+console.log(`testing ${base}`);
 
 const chromePath = process.env.CHROME_PATH ?? '/usr/bin/google-chrome';
 const headed = process.argv.includes('--headed');
@@ -112,6 +120,7 @@ const runViewport = async (label, viewport, { mockVr = false } = {}) => {
     check(`${label}: no page scrollbar`, !info.scrollable);
     check(`${label}: VR entry gating`, mockVr ? /VR/.test(info.enterSub) : /Desktop/.test(info.enterSub), info.enterSub);
     check(`${label}: title`, info.title.startsWith('SiteXR'), info.title);
+    if (urlArg !== -1) check(`${label}: served over HTTPS`, base.startsWith('https://'), base);
 
     if (!mockVr && loaded) {
         await page.click('#enter');
