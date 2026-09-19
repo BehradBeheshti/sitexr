@@ -21,6 +21,8 @@ type ViewerAssets = {
     contentUrl?: string;
     /** SITEXR: a `.glb` mesh model to place in the scene, on its own or over a splat. */
     modelUrl?: string;
+    /** SITEXR: add fill lights for a mesh model, which carries no baked lighting. */
+    interiorLighting?: boolean;
     /** SITEXR: how that model is placed: metres per unit, world offset, Y rotation. */
     modelTransform?: { scale?: number; offset?: [number, number, number]; yaw?: number };
     /**

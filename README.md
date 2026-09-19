@@ -173,35 +173,67 @@ an 8 × 8 m room reduced to 9 m² of total surface, which looks like furniture f
 space. assimp reads the same file correctly. If a converted model looks sparse, measure its
 surface area before believing it.
 
-### `.rvt`, and why it needs Autodesk
+### `.rvt`
 
-A Revit file can be opened and read on Linux, but no mesh comes out of it, and the reason
-is worth knowing before anyone spends a day on it.
+A Revit file opens fine on Linux but no mesh comes out of it directly, and the reason is
+worth knowing. `.rvt` is an OLE compound document whose `Partitions/*` streams are runs of
+gzip members; those decompress (43.6 MB of element records for the office building here),
+and they hold family names, unit strings and double-precision control points in feet. What
+they do not hold is triangles. Revit stores a *parametric* model, and the mesh exists only
+once its geometry kernel regenerates it. Reading the file is not the hard part.
 
-`.rvt` is an OLE compound document. Its element data lives in the `Partitions/*` streams as
-a sequence of gzip members, each about 128 KB, and those do decompress: `Office Building.rvt`
-yields 43.6 MB of element records holding family and type names, unit definitions and
-double-precision control points in feet. What it does not hold is triangles. Revit stores a
-*parametric* model — a wall is a curve plus a type plus host constraints, and the mesh only
-exists once Revit's geometry kernel regenerates it. Reconstructing that means reimplementing
-the kernel, including the booleans that cut openings.
+Four routes give you that kernel's output. The first is the best input this project takes:
 
-So there are three real routes, and `tools/aps-convert.mjs` automates the third:
-
-1. **File → Export → IFC** in Revit, then `tools/ifc-to-glb.py`. Best quality, needs Revit.
-2. **ODA BimRv SDK**, which reads `.rvt` natively. Commercial licence.
-3. **Autodesk Platform Services**, which runs the real kernel in Autodesk's cloud:
+1. **File → Export → IFC** in Revit. Needs Revit, gives the cleanest result.
+2. **DataDrivenConstruction's RVT2IFC converter**, which packages an ODA runtime and runs
+   locally on Linux with no upload. This is how `Office Building.ifc` was produced.
+3. **ODA BimRv SDK**, the same engine under a commercial licence.
+4. **Autodesk Platform Services**, via `tools/aps-convert.mjs`:
 
 ```sh
 # free account at https://aps.autodesk.com/ -> create an app -> Model Derivative API
 APS_CLIENT_ID=... APS_CLIENT_SECRET=... \
     node tools/aps-convert.mjs "Office Building.rvt" out/office
-python3 tools/fbx-to-glb.py out/office.obj out/office-raw.glb
-node tools/optimize-glb.mjs out/office-raw.glb public/bim/office.glb \
-    --scale 0.3048 --double-sided --ground
+python3 tools/fbx-to-glb.py out/office.obj out/office-raw.glb   # assimp reads OBJ too
+node tools/optimize-glb.mjs out/office-raw.glb public/private/office.glb \
+    --scale 0.3048 --double-sided
 ```
 
-That uploads the model to Autodesk. Check the licence before running it on a client file.
+That last one uploads the model to Autodesk. Check the licence before running it.
+
+### Coplanar surfaces, and the striping they cause
+
+An IFC gives a slab, its floor finish and the site pad the same surface height. Two coplanar
+faces fight for depth at any precision, and the floor stripes as you move. Raising the near
+plane helps and is worth doing — the viewer now floors the depth ratio at 1:2048 rather than
+1:16384 — but it does not fix true coincidence. Convert the offenders separately and merge
+them at an offset:
+
+```sh
+python3 tools/ifc-to-glb.py model.ifc /tmp/struct.glb \
+    --exclude IfcSpace,IfcOpeningElement,IfcCovering,IfcSite
+python3 tools/ifc-to-glb.py model.ifc /tmp/cover.glb --include IfcCovering
+python3 tools/ifc-to-glb.py model.ifc /tmp/site.glb  --include IfcSite
+
+node tools/optimize-glb.mjs /tmp/struct.glb public/private/office-building.glb \
+    --merge /tmp/cover.glb@0.006 --merge /tmp/site.glb@-0.05 --double-sided
+```
+
+Finishes 6 mm proud of the slab, site pad 50 mm below it. Both are invisible and both stop
+the flicker.
+
+### A design model has no lighting
+
+A splat carries the light it was captured in; a mesh model carries none. A single sun leaves
+every surface facing away from it at flat ambient, which reads as murk indoors. A site with
+`model` and no `contentUrl` turns on `interiorLighting`, which raises ambient and adds two
+unshadowed fills. No shadow maps: not worth the draw cost on a Quest.
+
+### Multi-storey models
+
+`spawn.floor`, and the optional `floor` on a point of interest or a tour stop, name the
+storey to stand on. Without one the downward ray starts above everything and a two-storey
+model answers with its roof, which is then where the visitor is standing.
 
 ### Keeping a licensed model out of a public repository
 
@@ -211,6 +243,17 @@ never enters the repository at all:
 
 ```sh
 VITE_ASSET_BASE=https://assets.example.com/sitexr npm run build
+```
+
+`public/private/` is the other half of this and needs no host at all. It is in `.gitignore`,
+a pre-commit hook refuses it, and `vite.config.js` deletes `dist/private` after every build
+unless you ask for it. A site whose model lives there is offered while developing and in a
+build that opts in, and is left out of the public one entirely, so the site list never shows
+something the server does not have:
+
+```sh
+npm run dev:https                      # the model is there; test it on the headset
+VITE_INCLUDE_PRIVATE=1 npm run build   # a build that carries it, for a private host
 ```
 
 Only the splat, collision and model urls are redirected; the app's own images stay local,

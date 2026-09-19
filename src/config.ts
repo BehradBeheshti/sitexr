@@ -42,8 +42,8 @@ export type Poi = {
     text: string;
     /** Marker position in world space (metres). */
     marker: [number, number, number];
-    /** Standing point (x, z) and a look target for "Go there". */
-    stand: { x: number; z: number; look: [number, number, number] };
+    /** Standing point (x, z) and a look target for "Go there". `floor` picks the storey. */
+    stand: { x: number; z: number; look: [number, number, number]; floor?: number };
 };
 
 export type TourStop = {
@@ -52,6 +52,8 @@ export type TourStop = {
     x: number;
     z: number;
     look: [number, number, number];
+    /** Approximate height of the storey to stand on, for a model with more than one. */
+    floor?: number;
     /** Seconds before the tour advances automatically. */
     dwell: number;
 };
@@ -362,7 +364,94 @@ const model2: Site = {
     }
 };
 
-export const SITES: Site[] = [excavator, komatsu, scaffold, model2];
+// The project's Revit model, exported to IFC and read with IfcOpenShell. Two storeys plus
+// roof, with the site pad kept so there is ground outside the walls to stand on.
+const officeBuilding: Site = {
+    id: 'office',
+    kind: 'design',
+    name: 'Office Building',
+    subtitle: 'Revit model \u00b7 two storeys \u00b7 787 elements',
+    blurb: 'Your Revit model at full size. Arrive in the double-height atrium beside the stair, go up to the second floor, and step outside to read the curtain walling from the approach.',
+    tag: 'Revit model',
+    poster: 'private/poster-office.webp',
+    model: { url: 'private/office-building.glb' },
+    collision: { type: 'mesh', url: 'private/office-building.glb' },
+    worldScale: 1,
+    // The atrium, not the approach: the storefront doors are modelled as solid glass, so a
+    // visitor who arrived outside could see in but never walk in.
+    spawn: { x: 8.3, z: 0.3, floor: 0, look: [3.4, 1.9, 2.2] },
+    walkRadius: 30,
+    background: [0.74, 0.77, 0.81],
+    pois: [
+        {
+            id: 'stair',
+            index: 1,
+            title: 'Atrium stair',
+            text: 'A steel pan stair with a pipe guardrail, rising through the double-height space. Treads and landings are the easiest thing to get wrong on paper and the easiest to judge standing at the bottom of them.',
+            marker: [3.4, 2.4, 2.2],
+            stand: { x: 8.3, z: 0.3, floor: 0, look: [3.4, 1.9, 2.2] }
+        },
+        {
+            id: 'level2',
+            index: 2,
+            title: 'Second floor',
+            text: 'The same spot one floor up, at the guardrail. Floor to floor is 3.66 m, and looking down over the edge tells you more about that dimension than any section drawing.',
+            marker: [7.2, 5.2, -1.0],
+            stand: { x: 8.3, z: 0.3, floor: 3.66, look: [3.4, 3.4, 2.2] }
+        },
+        {
+            id: 'frontage',
+            index: 3,
+            title: 'Glazed entrance',
+            text: 'The approach, with the double-height storefront ahead. Seen from where a visitor would actually arrive rather than from an elevation.',
+            marker: [6.5, 4.5, 10.5],
+            stand: { x: -9, z: 11, floor: 0, look: [4, 2.2, 8.8] }
+        },
+        {
+            id: 'curve',
+            index: 4,
+            title: 'Curved wing',
+            text: 'Curtain walling wrapped around the curve, with the desks behind it. Whether a curved facade reads as one surface or as a run of flat panels is a question you can only settle by walking along it.',
+            marker: [-18.5, 4.5, 6],
+            stand: { x: -12, z: 13, floor: 0, look: [-19, 2.5, 4] }
+        }
+    ],
+    tour: [
+        { title: 'Arrival', text: 'A design model, not a capture: your building as drawn, at full size.', x: 8.3, z: 0.3, floor: 0, look: [3.4, 1.9, 2.2], dwell: 9 },
+        { title: 'Second floor', text: 'The same spot one floor up. Floor to floor is 3.66 m.', x: 8.3, z: 0.3, floor: 3.66, look: [3.4, 3.4, 2.2], dwell: 10 },
+        { title: 'Glazed entrance', text: 'Outside now, on the approach, with the storefront ahead.', x: -9, z: 11, floor: 0, look: [4, 2.2, 8.8], dwell: 10 },
+        { title: 'Curved wing', text: 'Curtain walling around the curve, desks behind it.', x: -12, z: 13, floor: 0, look: [-19, 2.5, 4], dwell: 10 },
+        { title: 'End of tour', text: 'Back in the atrium. Explore freely, or press B for the menu.', x: 8.3, z: 0.3, floor: 0, look: [3.4, 1.9, 2.2], dwell: 6 }
+    ],
+    credits: {
+        sceneTitle: 'Office Building (Revit model)',
+        sceneAuthor: 'supplied by the project',
+        sceneLicense: 'not for redistribution',
+        sceneLicenseUrl: '',
+        sceneSourceUrl: '',
+        changes: 'Exported from Revit to IFC4, triangulated with IfcOpenShell, node transforms baked in, meshes merged by material and materials made double-sided so walls read from inside. Fill lights added because a model carries no baked lighting of its own.'
+    }
+};
+
+/**
+ * Whether to offer sites whose model lives in `public/private/`, which is never committed.
+ *
+ * True while developing, because the file is sitting there; true for a build that points at
+ * a private asset host or that opts in explicitly. False for the public Pages build, so the
+ * site list never offers something the server does not have.
+ */
+const PRIVATE_ASSETS =
+    import.meta.env.DEV ||
+    !!ASSET_BASE ||
+    (import.meta.env.VITE_INCLUDE_PRIVATE as string | undefined) === '1';
+
+export const SITES: Site[] = [
+    excavator,
+    komatsu,
+    scaffold,
+    ...(PRIVATE_ASSETS ? [officeBuilding] : []),
+    model2
+];
 export const DEFAULT_SITE = excavator.id;
 
 export const sitesOf = (mode: ModeId) => SITES.filter((s) => s.kind === mode);

@@ -142,7 +142,7 @@ export class XrRig {
     private cursorMat: StandardMaterial;
 
     /** Arrival point and look target (world metres). */
-    spawn: { x: number; z: number; look: [number, number, number] };
+    spawn: { x: number; z: number; look: [number, number, number]; floor?: number };
 
     /** Visitors are kept within this radius of the scene origin. */
     walkRadius: number;
@@ -154,7 +154,10 @@ export class XrRig {
         camera: Entity,
         collision: Collision | null,
         layer: Layer,
-        opts: { spawn: { x: number; z: number; look: [number, number, number] }; walkRadius: number }
+        opts: {
+            spawn: { x: number; z: number; look: [number, number, number]; floor?: number };
+            walkRadius: number;
+        }
     ) {
         this.app = app;
         this.spawn = opts.spawn;
@@ -229,8 +232,11 @@ export class XrRig {
         return new Promise((resolve, reject) => {
             const cam = this.camera.camera;
             const scale = FRAMEBUFFER_SCALE[settings.get().quality];
-            this.camera.camera.nearClip = 0.02;
-            this.camera.camera.farClip = 400;
+            // 0.05/300 rather than 0.02/400: the extra depth precision keeps coplanar
+            // surfaces in a design model from striping, and nothing 5 cm from an eye is
+            // worth drawing anyway.
+            this.camera.camera.nearClip = 0.05;
+            this.camera.camera.farClip = 300;
             this.app.xr.start(cam, 'immersive-vr', 'local-floor', {
                 framebufferScaleFactor: scale,
                 optionalFeatures: ['local-floor', 'bounded-floor', 'hand-tracking'],
@@ -283,8 +289,14 @@ export class XrRig {
         return hit ? hit.y : null;
     }
 
-    /** Nearest standable floor point to (x, z): what the tour and "Go there" use. */
-    findStand(x: number, z: number, hintY?: number): Vec3 {
+    /**
+     * Nearest standable floor point to (x, z): what the tour and "Go there" use.
+     *
+     * `floorY` names the storey to land on. Without it the downward ray starts above
+     * everything and a multi-storey model answers with its roof, which is where a
+     * visitor would then be standing.
+     */
+    findStand(x: number, z: number, floorY?: number): Vec3 {
         // A navigation grid answers this directly and exactly; the voxel lattice search is
         // the fallback for scenes that ship voxel collision data.
         const grid = this.collision as unknown as {
@@ -294,7 +306,13 @@ export class XrRig {
             const hit = grid.nearestStand(x, z);
             if (hit) return new Vec3(hit.x, hit.y, hit.z);
         }
-        const g = hintY ?? this.groundAt(x, z) ?? 0;
+        // Prefer the named storey, but fall back to the full-range search so a site whose
+        // ground dips below the hint still finds it.
+        const g =
+            (floorY === undefined ? undefined : this.groundAt(x, z, floorY + 2.2, 3.4)) ??
+            this.groundAt(x, z) ??
+            floorY ??
+            0;
         const out = { x, y: g, z };
         if (this.collision && findCylinderSpawn(this.collision, x, g + 0.9, z, 0.95, 0.25, out)) {
             return new Vec3(out.x, out.y, out.z);
@@ -383,7 +401,7 @@ export class XrRig {
     }
 
     resetToSpawn(blink = true): Promise<void> {
-        const stand = this.findStand(this.spawn.x, this.spawn.z);
+        const stand = this.findStand(this.spawn.x, this.spawn.z, this.spawn.floor);
         if (blink) return this.blinkTo(stand.x, stand.y, stand.z, this.spawn.look);
         this.placeHead(stand.x, stand.y, stand.z, this.spawn.look);
         return Promise.resolve();

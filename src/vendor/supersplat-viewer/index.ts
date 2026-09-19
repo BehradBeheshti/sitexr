@@ -194,6 +194,25 @@ const createApp = async (canvas: HTMLCanvasElement, config: Config) => {
 
     app.scene.ambientLight.set(0.51, 0.55, 0.65);
 
+    // SITEXR: a mesh model carries no baked lighting, unlike a splat capture. One sun
+    // leaves every surface facing away from it at flat ambient, which reads as murk once
+    // you are indoors. Two unshadowed fills, from the opposite side and from below, give
+    // interior walls and soffits some falloff. No shadow maps: the draw cost on a Quest
+    // is not worth it for a model this size.
+    if (config.interiorLighting) {
+        app.scene.ambientLight.set(0.62, 0.65, 0.72);
+
+        const fill = new Entity('fill light', app);
+        fill.setEulerAngles(28, 225, 0);
+        fill.addComponent('light', { color: new Color(0.86, 0.9, 1.0), intensity: 0.55 });
+        app.root.addChild(fill);
+
+        const bounce = new Entity('bounce light', app);
+        bounce.setEulerAngles(-55, 120, 0);
+        bounce.addComponent('light', { color: new Color(0.95, 0.93, 0.88), intensity: 0.28 });
+        app.root.addChild(bounce);
+    }
+
     return { app, camera, renderer };
 };
 
@@ -288,6 +307,7 @@ const resolveConfig = (options: CreateViewerOptions): Config => ({
     // SITEXR: a model-only scene has no splat to fetch
     contents: options.contents ?? (options.contentUrl ? fetch(options.contentUrl) : undefined),
     modelUrl: options.modelUrl,
+    interiorLighting: options.interiorLighting, // SITEXR
     modelTransform: options.modelTransform,
     renderer: options.renderer ?? 'webgpu',
     ui: options.ui ?? true,

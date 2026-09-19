@@ -188,6 +188,8 @@ const main = async () => {
             collisionUrl: site.collision.type === 'voxel' ? assetUrl(site.collision.url) : undefined,
             collision: collisionPromise,
             modelUrl: site.model ? assetUrl(site.model.url) : undefined,
+            // a model with no splat behind it has no baked lighting of its own
+            interiorLighting: !!site.model && !site.contentUrl,
             collisionFromModel: site.collision.type === 'mesh' ? buildMeshCollision : undefined,
             modelTransform: site.model
                 ? { scale: site.model.scale, offset: site.model.offset, yaw: site.model.yaw }
@@ -256,7 +258,7 @@ const main = async () => {
         const markers = new Markers(rig, site.pois, {
             onDesktopSelect: (poi: Poi) => screens.showPoi(poi),
             onGoThere: (poi: Poi) => {
-                const s = rig.findStand(poi.stand.x, poi.stand.z);
+                const s = rig.findStand(poi.stand.x, poi.stand.z, poi.stand.floor ?? site.spawn.floor);
                 rig.blinkTo(s.x, s.y, s.z, poi.stand.look);
             }
         });
@@ -301,7 +303,7 @@ const main = async () => {
 
         const vrPresenter: TourPresenter = {
             travel: async (stop) => {
-                const s = rig.findStand(stop.x, stop.z);
+                const s = rig.findStand(stop.x, stop.z, stop.floor ?? site.spawn.floor);
                 await rig.blinkTo(s.x, s.y, s.z, stop.look);
             },
             caption: (stop, i, n) => {

@@ -57,18 +57,18 @@ await page.evaluate(() => document.getElementById('enter').click());
 await new Promise((r) => setTimeout(r, 3500));
 await page.screenshot({ path: join(out, '00-spawn.png') });
 
-const place = async (name, x, z, look, eye = 1.65) => {
-    const info = await page.evaluate(({ x, z, look, eye }) => {
+const place = async (name, x, z, look, eye = 1.65, floor) => {
+    const info = await page.evaluate(({ x, z, look, eye, floor }) => {
         const qa = window.__sitexr;
         const cm = qa.viewer.internals.cameraManager();
-        const stand = qa.rig.findStand(x, z);
+        const stand = qa.rig.findStand(x, z, floor ?? qa.site.spawn.floor);
         const V = stand.constructor;
         qa.viewer.state.cameraMode = 'walk';
         cm.camera.look(new V(stand.x, stand.y + eye, stand.z), new V(look[0], look[1], look[2]));
         cm.snap();
         qa.viewer.app.renderNextFrame = true;
         return { x: +stand.x.toFixed(2), y: +stand.y.toFixed(2), z: +stand.z.toFixed(2), asked: [x, z] };
-    }, { x, z, look, eye });
+    }, { x, z, look, eye, floor });
     await new Promise((r) => setTimeout(r, 2200));
     await page.screenshot({ path: join(out, `${name}.png`) });
     console.log(name, 'asked', info.asked.join(','), '-> stand', `${info.x},${info.y},${info.z}`);
@@ -92,8 +92,8 @@ const viewsArg = process.argv.indexOf('--views');
 if (viewsArg !== -1) {
     for (const spec of process.argv[viewsArg + 1].split(';')) {
         const [name, nums] = spec.split(':');
-        const [x, z, lx, ly, lz] = nums.split(',').map(Number);
-        await place(`probe-${name}`, x, z, [lx, ly, lz]);
+        const [x, z, lx, ly, lz, floor] = nums.split(',').map(Number);
+        await place(`probe-${name}`, x, z, [lx, ly, lz], 1.65, Number.isFinite(floor) ? floor : undefined);
     }
     await browser.close();
     server.close();
@@ -106,10 +106,10 @@ const site = await page.evaluate(() => {
     return { spawn: s.spawn, pois: s.pois.map((p) => ({ id: p.id, stand: p.stand })), tour: s.tour };
 });
 await place('02-spawn-view', site.spawn.x, site.spawn.z, site.spawn.look);
-for (const p of site.pois) await place(`poi-${p.id}`, p.stand.x, p.stand.z, p.stand.look);
+for (const p of site.pois) await place(`poi-${p.id}`, p.stand.x, p.stand.z, p.stand.look, 1.65, p.stand.floor);
 for (let i = 0; i < site.tour.length; i++) {
     const t = site.tour[i];
-    await place(`tour-${i}-${t.title.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}`, t.x, t.z, t.look);
+    await place(`tour-${i}-${t.title.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}`, t.x, t.z, t.look, 1.65, t.floor);
 }
 await browser.close();
 server.close();

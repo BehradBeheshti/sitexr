@@ -351,7 +351,11 @@ class Viewer {
             const dist = vec.dot(cameraEntity.forward);
 
             const far = Math.max(dist + boundRadius, 1e-2);
-            const near = Math.max(dist - boundRadius, far / (1024 * 16));
+            // SITEXR: a design model carries its site pad, so the bound radius is large and
+            // `dist - boundRadius` goes negative, pinning the near plane at far/16384. At that
+            // depth ratio a floor finish and the slab under it fight for the same depth values
+            // and the floor stripes. 1:2048 is still far more range than a walkable scene uses.
+            const near = Math.max(dist - boundRadius, far / 2048);
 
             cameraEntity.camera.farClip = far;
             cameraEntity.camera.nearClip = Math.min(1.0, near);

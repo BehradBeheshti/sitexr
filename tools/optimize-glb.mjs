@@ -8,7 +8,7 @@
 //
 //   node tools/optimize-glb.mjs in.glb out.glb [--scale 1]
 import { NodeIO, Primitive } from '@gltf-transform/core';
-import { dedup, join, prune, transformMesh, weld } from '@gltf-transform/functions';
+import { dedup, join, mergeDocuments, prune, transformMesh, weld } from '@gltf-transform/functions';
 
 const [src, dst] = process.argv.slice(2);
 if (!src || !dst) {
@@ -20,6 +20,44 @@ const scale = scaleArg === -1 ? 1 : Number(process.argv[scaleArg + 1]);
 
 const io = new NodeIO();
 const doc = await io.read(src);
+
+// --merge <file>@<dy> (repeatable): bring another GLB in, lifted by dy metres.
+//
+// This exists for floor and ceiling finishes. An IFC gives a slab and its covering exactly
+// the same surface height, and two coplanar faces stripe at any depth precision. Converting
+// the finishes separately and lifting them a few millimetres settles it for good, which
+// raising the near plane cannot.
+for (let i = 0; i < process.argv.length; i++) {
+    if (process.argv[i] !== '--merge') continue;
+    const [path, dyStr] = process.argv[i + 1].split('@');
+    const dy = Number(dyStr ?? 0);
+    const other = await io.read(path);
+    const lift = other.createNode('merged').setTranslation([0, dy, 0]);
+    for (const scene of other.getRoot().listScenes()) {
+        for (const child of scene.listChildren()) {
+            scene.removeChild(child);
+            lift.addChild(child);
+        }
+    }
+    other.getRoot().listScenes()[0].addChild(lift);
+    mergeDocuments(doc, other);
+    // merge() brings the other document's scenes across; fold their roots into ours.
+    const scenes = doc.getRoot().listScenes();
+    const main = scenes[0];
+    for (const extra of scenes.slice(1)) {
+        for (const child of extra.listChildren()) {
+            extra.removeChild(child);
+            main.addChild(child);
+        }
+        extra.dispose();
+    }
+    // a GLB holds one buffer, and merging brought a second across
+    const buffers = doc.getRoot().listBuffers();
+    for (const accessor of doc.getRoot().listAccessors()) accessor.setBuffer(buffers[0]);
+    for (const extra of buffers.slice(1)) extra.dispose();
+
+    console.log(`merged ${path} lifted ${dy * 1000} mm`);
+}
 
 const before = doc.getRoot().listMeshes().length;
 
