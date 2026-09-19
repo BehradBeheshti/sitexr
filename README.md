@@ -279,6 +279,30 @@ and the bucket must allow cross-origin reads. `public/private/` and the model fo
 gitignored, and `bash tools/install-hooks.sh` adds a pre-commit hook that refuses to commit
 them by accident.
 
+## Capturing images for figures
+
+`tools/capture-figures.mjs` renders a large still set from the built site: for every site the
+arrival point, seven angles swept around it, each point of interest, each tour stop and two
+plan views, each written twice — once as a visitor sees it, once with the interface and the
+markers removed, which is what a figure usually wants. Interface screens are captured too.
+
+```sh
+VITE_INCLUDE_PRIVATE=1 npm run build
+node tools/capture-figures.mjs                       # 1920x1080 into test-output/figures
+node tools/capture-figures.mjs --width 3840 --height 2160 --settle 2600
+```
+
+`--settle` is how long each camera is given before the shutter. Splats converge progressively,
+so a low value on a heavy scene shows a half-sorted frame. 1800 ms is enough for these four.
+
+`tools/contact-sheet.py` turns any folder of images into one labelled sheet, which is much
+faster to pick from than a file browser:
+
+```sh
+python3 tools/contact-sheet.py test-output/figures/01-sites/office/clean sheet.jpg \
+    --cols 5 --title "Office building"
+```
+
 ## Asset pipeline (Linux, Node only)
 
 `source-assets/` holds the downloaded scenes; `public/scene*/` holds what the app serves.
