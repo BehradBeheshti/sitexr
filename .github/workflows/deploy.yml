@@ -24,6 +24,26 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+
+      # Design models are not kept in git. History is permanent, so a model that might
+      # one day need to come down does not belong in it. They are attached to the
+      # `model-assets` release instead, which can be deleted, and deleting it removes
+      # them from the site on the next deploy.
+      #
+      # A missing release is not an error: the build simply leaves those sites out, so
+      # the site list never offers something the server does not have.
+      - name: Fetch design models
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p public/private
+          if gh release download model-assets --dir public/private --clobber; then
+            echo "VITE_INCLUDE_PRIVATE=1" >> "$GITHUB_ENV"
+            ls -la public/private
+          else
+            echo "no model-assets release found — building without the design models"
+          fi
+
       # Project sites are served from /<repo>/, so the build needs that base path.
       - run: BASE_PATH="/${GITHUB_REPOSITORY#*/}/" npm run build
       - uses: actions/configure-pages@v5

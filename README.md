@@ -256,6 +256,24 @@ npm run dev:https                      # the model is there; test it on the head
 VITE_INCLUDE_PRIVATE=1 npm run build   # a build that carries it, for a private host
 ```
 
+To serve a model from the public site without putting it in the repository, attach it to a
+release. Release assets are not part of the repository or its history, so they are absent
+from every clone, and unlike a commit they can be deleted:
+
+```sh
+gh release create model-assets \
+    public/private/office-building.glb public/private/poster-office.webp \
+    --title "Model assets (served by the site, not stored in git)" \
+    --notes "Fetched by the deploy workflow. Delete this release to take them down."
+```
+
+The deploy workflow downloads that release into `public/private/` and sets
+`VITE_INCLUDE_PRIVATE=1` for the build. A missing release is not an error: the build leaves
+those sites out, so the site list never offers something the server does not have. Note the
+trade this makes. The file stays out of git, but anyone who opens the page downloads it into
+their own browser, because that is how the model gets drawn. If the model must not reach the
+public at all, the page showing it has to sit behind a login.
+
 Only the splat, collision and model urls are redirected; the app's own images stay local,
 and the bucket must allow cross-origin reads. `public/private/` and the model formats are
 gitignored, and `bash tools/install-hooks.sh` adds a pre-commit hook that refuses to commit
