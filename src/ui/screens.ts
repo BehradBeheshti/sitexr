@@ -1,6 +1,6 @@
 // The DOM side of SiteXR: loading / welcome overlay, the desktop walkthrough HUD, the
 // settings and credits modals. Nothing here is visible inside an immersive session.
-import { MODES, sitesOf } from '../config';
+import { MODES, availableModes, sitesOf } from '../config';
 import type { ModeId, Poi, Site, TourStop } from '../config';
 import { settings } from '../settings';
 import type { Comfort } from '../settings';
@@ -78,7 +78,7 @@ export class Screens {
     private renderModes() {
         const host = $('modes');
         host.innerHTML = '';
-        for (const mode of MODES) {
+        for (const mode of availableModes()) {
             const b = document.createElement('button');
             b.className = 'mode';
             b.type = 'button';

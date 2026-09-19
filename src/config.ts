@@ -90,8 +90,8 @@ export const MODES: Mode[] = [
     {
         id: 'design',
         name: 'Design Models',
-        tagline: 'BIM · SketchUp, Revit and IFC models',
-        blurb: 'Walk a building information model at full size, the way it would be reviewed before anything is built.',
+        tagline: 'BIM · Revit and IFC models',
+        blurb: 'Walk a building information model at full size, on both floors and from the approach, the way it would be reviewed before anything is built.',
         audience: 'for design and BIM teams reviewing what is drawn'
     }
 ];
@@ -304,65 +304,6 @@ const scaffold: Site = {
     }
 };
 
-// A design model rather than a capture: the project's SketchUp file, read with OpenSKP and
-// converted to glTF. The mesh is its own collision surface, so the furniture blocks you and
-// the floor carries you, which is what walking a model is for.
-const model2: Site = {
-    id: 'model2',
-    kind: 'design',
-    name: 'Model 2',
-    subtitle: 'SketchUp model \u00b7 sofa, armchair, coffee table',
-    blurb: 'Your SketchUp file as it was authored: a sofa, an armchair and a coffee table, at full size on an open floor. Walk around them and judge the proportions the way you would in a showroom.',
-    tag: 'SketchUp model',
-    poster: 'brand/poster-model2.webp',
-    model: { url: 'bim/model2-sketchup.glb' },
-    collision: { type: 'mesh', url: 'bim/model2-sketchup.glb' },
-    worldScale: 1,
-    spawn: { x: 1.6, z: 2.4, floor: 0, look: [1.6, 0.5, -1.7] },
-    walkRadius: 5.5,
-    background: [0.78, 0.79, 0.81],
-    pois: [
-        {
-            id: 'seat',
-            index: 1,
-            title: 'Seat height',
-            text: 'The tallest point of this model is 740 mm above the floor. Seat and back heights are the numbers a drawing states and the eye argues with, so stand beside it and look down.',
-            marker: [2.2, 0.9, -3.0],
-            stand: { x: 2.2, z: -1.6, look: [2.2, 0.7, -2.9] }
-        },
-        {
-            id: 'footprint',
-            index: 2,
-            title: 'Footprint',
-            text: 'The group covers 2.57 m across by 3.44 m deep. Pacing that out tells you more about whether it fits a room than the plan view does.',
-            marker: [0.5, 0.9, -1.7],
-            stand: { x: -1.2, z: -1.7, look: [1.6, 0.4, -1.7] }
-        },
-        {
-            id: 'clearance',
-            index: 3,
-            title: 'Circulation',
-            text: 'Walk the gap you would leave in front of it. Under about 900 mm a route past furniture starts to feel tight, and that is easier to feel than to measure.',
-            marker: [1.6, 0.9, 0.6],
-            stand: { x: 1.6, z: 1.3, look: [1.6, 0.4, -1.4] }
-        }
-    ],
-    tour: [
-        { title: 'Arrival', text: 'A design model, not a capture: your SketchUp file at full size.', x: 1.6, z: 2.4, look: [1.6, 0.5, -1.7], dwell: 8 },
-        { title: 'Footprint', text: '2.57 m across, 3.44 m deep. Seen from the side, at the size it would really be.', x: -1.2, z: -1.7, look: [1.6, 0.4, -1.7], dwell: 9 },
-        { title: 'Seat height', text: '740 mm to the highest point. Look down on it rather than at it.', x: 2.2, z: -1.6, look: [2.2, 0.7, -2.9], dwell: 9 },
-        { title: 'Circulation', text: 'The gap in front, at walking distance.', x: 1.6, z: 1.3, look: [1.6, 0.4, -1.4], dwell: 8 },
-        { title: 'End of tour', text: 'Back at the arrival point. Explore freely, or press B for the menu.', x: 1.6, z: 2.4, look: [1.6, 0.5, -1.7], dwell: 6 }
-    ],
-    credits: {
-        sceneTitle: 'Model 2.skp',
-        sceneAuthor: 'supplied by the project',
-        sceneLicense: 'not for redistribution',
-        sceneLicenseUrl: '',
-        sceneSourceUrl: '',
-        changes: 'Read from the SketchUp file with OpenSKP, exported in millimetres and rescaled to metres, node transforms baked in, meshes merged, materials made double-sided and a floor plane added. The file contains three furniture components only \u2014 no building shell.'
-    }
-};
 
 // The project's Revit model, exported to IFC and read with IfcOpenShell. Two storeys plus
 // roof, with the site pad kept so there is ground outside the walls to stand on.
@@ -445,16 +386,17 @@ const PRIVATE_ASSETS =
     !!ASSET_BASE ||
     (import.meta.env.VITE_INCLUDE_PRIVATE as string | undefined) === '1';
 
-export const SITES: Site[] = [
-    excavator,
-    komatsu,
-    scaffold,
-    ...(PRIVATE_ASSETS ? [officeBuilding] : []),
-    model2
-];
+export const SITES: Site[] = [excavator, komatsu, scaffold, ...(PRIVATE_ASSETS ? [officeBuilding] : [])];
 export const DEFAULT_SITE = excavator.id;
 
 export const sitesOf = (mode: ModeId) => SITES.filter((s) => s.kind === mode);
+
+/**
+ * The experiences this build can actually show. The design track's model is fetched at
+ * deploy time rather than committed, so a build without it has nothing to offer there and
+ * the chooser must not present an empty side.
+ */
+export const availableModes = () => MODES.filter((m) => sitesOf(m.id).length > 0);
 export const modeOf = (siteId: string): ModeId => SITES.find((s) => s.id === siteId)?.kind ?? 'capture';
 export const defaultSiteOf = (mode: ModeId) => sitesOf(mode)[0];
 
