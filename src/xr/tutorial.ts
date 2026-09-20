@@ -40,7 +40,7 @@ export class Tutorial {
 
     private onDone: () => void;
 
-    constructor(rig: XrRig, onDone: () => void) {
+    constructor(rig: XrRig, onDone: () => void, opts: { doors?: boolean } = {}) {
         this.rig = rig;
         this.onDone = onDone;
         this.panel = new Panel(rig.app, rig.layer, { name: 'tutorial', width: 0.8, height: 0.5, pixels: 1024, overlay: true });
@@ -76,7 +76,9 @@ export class Tutorial {
             },
             {
                 title: 'Menu and reset',
-                text: 'Press B for the menu, Y to reset your position, and X to start the guided tour. Point at a numbered marker and press the trigger to read a site note.',
+                text: opts.doors
+                    ? 'Press B for the menu, Y to reset, X for the guided tour. Point at a marker and pull the trigger to read a note \u2014 or at a door, to open it.'
+                    : 'Press B for the menu, Y to reset your position, and X to start the guided tour. Point at a numbered marker and press the trigger to read a site note.',
                 check: (t) => t.pressed
             }
         ];

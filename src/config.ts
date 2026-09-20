@@ -112,6 +112,8 @@ export type Site = {
     /** A `.glb` mesh model placed in the scene, on its own or over a captured site. */
     model?: { url: string; scale?: number; offset?: [number, number, number]; yaw?: number };
     collision: { type: 'voxel' | 'grid' | 'mesh'; url: string };
+    /** Openable door leaves extracted from the source model by `tools/ifc-doors.py`. */
+    doors?: { url: string };
     /** Metres per scene unit. */
     worldScale: number;
     /** Arrival point, look target and an approximate floor height for the first camera. */
@@ -312,11 +314,12 @@ const officeBuilding: Site = {
     kind: 'design',
     name: 'Office Building',
     subtitle: 'Revit model \u00b7 two storeys \u00b7 787 elements',
-    blurb: 'Your Revit model at full size. Arrive in the double-height atrium beside the stair, go up to the second floor, and step outside to read the curtain walling from the approach.',
+    blurb: 'Your Revit model at full size, with doors that open. Arrive in the double-height atrium beside the stair, go up to the second floor, and step outside to read the curtain walling from the approach.',
     tag: 'Revit model',
     poster: 'private/poster-office.webp',
     model: { url: 'private/office-building.glb' },
     collision: { type: 'mesh', url: 'private/office-building.glb' },
+    doors: { url: 'private/office-doors.json' },
     worldScale: 1,
     // The atrium, not the approach: the storefront doors are modelled as solid glass, so a
     // visitor who arrived outside could see in but never walk in.
@@ -344,7 +347,7 @@ const officeBuilding: Site = {
             id: 'frontage',
             index: 3,
             title: 'Glazed entrance',
-            text: 'The approach, with the double-height storefront ahead. Seen from where a visitor would actually arrive rather than from an elevation.',
+            text: 'The approach, with the double-height storefront ahead. Point at a door and pull the trigger to swing it open, or just walk into it and it gives way.',
             marker: [6.5, 4.5, 10.5],
             stand: { x: -9, z: 11, floor: 0, look: [4, 2.2, 8.8] }
         },

@@ -1,7 +1,7 @@
 // SiteXR — Immersive Construction Review. Bootstraps the splat viewer for the chosen site,
 // decides between immersive VR and the desktop walkthrough, and wires the SiteXR layer.
 import { Vec3, platform } from 'playcanvas';
-import type { Entity, GSplatComponent } from 'playcanvas';
+import type { AppBase, Entity, GSplatComponent } from 'playcanvas';
 
 import { ASSETS, DEFAULT_SITE, EYE_HEIGHT, MODES, SITES, assetUrl, defaultSiteOf, modeOf, viewerSettings } from './config';
 import type { ModeId, Poi, Site, TourStop } from './config';
@@ -9,6 +9,7 @@ import { BUDGETS, FOVEATION, settings } from './settings';
 import { Screens } from './ui/screens';
 import { createViewer } from './vendor/supersplat-viewer/index';
 import type { Collision } from './vendor/supersplat-viewer/collision';
+import { DoorSet } from './xr/doors';
 import { GridCollision } from './xr/grid-collision';
 import { collisionFromModel } from './xr/model-collision';
 import { Markers } from './xr/markers';
@@ -251,6 +252,24 @@ const main = async () => {
         }
         const rig = new XrRig(app, camera, collision, layer, { spawn: site.spawn, walkRadius: site.walkRadius });
 
+        // Doors, when the site has them. They register as interactables, so the controller
+        // ray, cursor and haptics all treat a door leaf like any other thing worth pointing
+        // at, and the rig asks them whether a doorway is currently blocked.
+        let doors: DoorSet | null = null;
+        if (site.doors) {
+            try {
+                doors = await DoorSet.load(assetUrl(site.doors.url), app, app.root, layer);
+                for (const leaf of doors.leaves) {
+                    if (leaf.openable) rig.interactables.add(leaf);
+                }
+                rig.doors = doors;
+                app.on('update', (dt: number) => doors?.update(dt));
+                attachDoorPicking(app, camera, rig, doors);
+            } catch (err) {
+                console.warn('doors unavailable:', err);
+            }
+        }
+
         const tour = new Tour(site.tour, { travel: async () => {}, caption: () => {}, end: () => {} }, () => {
             screens.setTourActive(tour.active);
         });
@@ -265,7 +284,13 @@ const main = async () => {
 
         const tutorial = new Tutorial(rig, () => {
             if (rig.active) toastVr('Tutorial complete. Press B for the menu.');
-        });
+        }, { doors: !!doors });
+
+        if (doors) {
+            const hint = document.getElementById('hud-hint');
+            if (hint) hint.textContent =
+                'Drag to look \u00b7 click the ground to walk there \u00b7 W A S D to move \u00b7 click a door to open it';
+        }
 
         const menu = new VrMenu(rig, {
             tourActive: () => tour.active,
@@ -454,7 +479,7 @@ const main = async () => {
 
         // Non-enumerable QA handle for the headless smoke test (not a user-facing control).
         Object.defineProperty(window, '__sitexr', {
-            value: { viewer, rig, menu, tutorial, markers, tour, settings, pois: site.pois, site },
+            value: { viewer, rig, menu, tutorial, markers, tour, settings, doors, pois: site.pois, site },
             enumerable: false,
             configurable: true
         });
@@ -498,3 +523,63 @@ main().catch((err) => {
     const label = document.getElementById('progress-label');
     if (label) label.textContent = 'The site could not be loaded. Please refresh to try again.';
 });
+
+/**
+ * Desktop: click a door to swing it. The viewer's own click-to-walk fires on the same
+ * canvas, so a click that lands on a door has to be swallowed before it becomes a walk.
+ */
+function attachDoorPicking(app: AppBase, camera: Entity, rig: XrRig, doors: DoorSet) {
+    const canvas = app.graphicsDevice.canvas;
+    const near = new Vec3();
+    const far = new Vec3();
+    const dir = new Vec3();
+    let down: { x: number; y: number } | null = null;
+
+    const pick = (clientX: number, clientY: number) => {
+        const cam = camera.camera;
+        if (!cam) return null;
+        const rect = canvas.getBoundingClientRect();
+        const sx = clientX - rect.left;
+        const sy = clientY - rect.top;
+        cam.screenToWorld(sx, sy, cam.nearClip + 0.01, near);
+        cam.screenToWorld(sx, sy, cam.nearClip + 20, far);
+        dir.sub2(far, near).normalize();
+        let best: { target: DoorSet['leaves'][number]; dist: number } | null = null;
+        for (const leaf of doors.leaves) {
+            const hit = { target: leaf, u: 0, v: 0, dist: 0, point: new Vec3() };
+            if (leaf.intersect(near, dir, hit) && (!best || hit.dist < best.dist)) {
+                best = { target: leaf, dist: hit.dist };
+            }
+        }
+        return best && best.dist < 14 ? best.target : null;
+    };
+
+    canvas.addEventListener('pointerdown', (e: PointerEvent) => {
+        if (rig.active) return;
+        down = { x: e.clientX, y: e.clientY };
+        if (pick(e.clientX, e.clientY)) {
+            e.stopPropagation();
+            e.preventDefault();
+        }
+    }, { capture: true });
+
+    canvas.addEventListener('pointerup', (e: PointerEvent) => {
+        if (rig.active || !down) return;
+        const moved = Math.hypot(e.clientX - down.x, e.clientY - down.y) > 6;
+        down = null;
+        if (moved) return;
+        const leaf = pick(e.clientX, e.clientY);
+        if (leaf) {
+            e.stopPropagation();
+            e.preventDefault();
+            leaf.toggle();
+        }
+    }, { capture: true });
+
+    canvas.addEventListener('pointermove', (e: PointerEvent) => {
+        if (rig.active) return;
+        const leaf = pick(e.clientX, e.clientY);
+        for (const l of doors.leaves) l.onHover(l === leaf ? ({} as never) : null);
+        if (leaf) canvas.style.cursor = 'pointer';
+    });
+}

@@ -222,6 +222,30 @@ node tools/optimize-glb.mjs /tmp/struct.glb public/private/office-building.glb \
 Finishes 6 mm proud of the slab, site pad 50 mm below it. Both are invisible and both stop
 the flicker.
 
+### Doors that open
+
+A Revit door arrives as one element holding a frame and a panel, and only the panel should
+swing. `tools/ifc-doors.py` splits them on a test the door itself supplies: within its
+triangulated shape, the sub-mesh whose width and height match the door's own `OverallWidth`
+and `OverallHeight` is the panel. Which edge hinges comes from `OperationType`
+(`SINGLE_SWING_RIGHT` and friends); `DOUBLE_*` is split into two leaves at the centre line,
+and `SWING_FIXED_*` keeps one leaf fixed. Which way it swings is read off the geometry: the
+panel sits off-centre in its frame, and it opens toward whichever side has the room.
+
+```sh
+python3 tools/ifc-doors.py model.ifc public/private/doors.json
+```
+
+Each leaf is written in its own hinge frame, so opening one is a rotation about a single
+entity's local Y with no matrix work per frame. Point at a leaf and pull the trigger, or
+click it on the desktop. Leaning on a shut one for a third of a second opens it too, so a
+visitor cannot be walled in by a door they could have opened.
+
+The building's glb must then be built **without** `IfcDoor`, because the doors come from the
+json instead. That also leaves the static collision mesh with open holes at every doorway,
+which is the point: a shut leaf puts its own box back through `rig.doors`, and an open one
+takes it away. Without that split a door could only ever be scenery.
+
 ### A design model has no lighting
 
 A splat carries the light it was captured in; a mesh model carries none. A single sun leaves

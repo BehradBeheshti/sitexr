@@ -440,6 +440,83 @@ const roomAfter = await headState();
 const moved = Math.hypot(roomAfter.x - roomBefore.x, roomAfter.z - roomBefore.z);
 check('physical head movement moves the view (room scale)', moved > 0.3, `moved ${moved.toFixed(2)} m`);
 
+// ---- doors, when the site has them --------------------------------------------------------
+const hasDoors = await page.evaluate(() => !!window.__sitexr.doors);
+if (hasDoors) {
+    // stand in front of a shut leaf, facing it
+    const aim = await page.evaluate(() => {
+        const qa = window.__sitexr;
+        const leaf = qa.doors.leaves.find((l) => l.openable);
+        const c = leaf.centre();
+        const fwd = leaf.entity.forward;             // across the doorway
+        const mid = { x: c.x, y: c.y, z: c.z };
+        const stand = qa.rig.findStand(c.x + fwd.x * 1.4, c.z + fwd.z * 1.4, qa.site.spawn.floor);
+        qa.rig.placeHead(stand.x, stand.y, stand.z, [mid.x, mid.y, mid.z]);
+        qa.doors.closeAll();
+        return { mid, name: leaf.label, standY: +stand.y.toFixed(2) };
+    });
+    await settle(1800);
+    await page.screenshot({ path: join(outDir, '11-door-shut.png') });
+
+    await aimAt('right', aim.mid);
+    await settle(700);
+    const hovering = await page.evaluate(() => {
+        const st = window.__sitexr.rig.debugState().find((h) => h.hand === 'right');
+        return st?.hit?.name ?? null;
+    });
+    check('controller ray picks out a door leaf', /^door-/.test(hovering ?? ''), `${hovering} (${aim.name})`);
+
+    await press('right', 'trigger');
+    await settle(1400);
+    const opened = await page.evaluate(() => {
+        const l = window.__sitexr.doors.leaves.find((x) => x.openable);
+        return { open: l.open, shut: l.shut };
+    });
+    check('a trigger press swings the door open', opened.open > 0.5 && !opened.shut, JSON.stringify(opened));
+    await page.screenshot({ path: join(outDir, '12-door-open.png') });
+
+    // the leaf has moved, so aim at where it is now rather than where it was
+    const nowAt = await page.evaluate(() => {
+        const c = window.__sitexr.doors.leaves.find((x) => x.openable).centre();
+        return { x: c.x, y: c.y, z: c.z };
+    });
+    await aimAt('right', nowAt);
+    await settle(700);
+    await press('right', 'trigger');
+    await settle(1600);
+    const reshut = await page.evaluate(() => window.__sitexr.doors.leaves.find((x) => x.openable).open);
+    check('a second press shuts it again', reshut < 0.5, `open ${reshut.toFixed(2)}`);
+
+    // a shut leaf is not a place the teleport arc will drop you
+    const blocked = await page.evaluate(() => {
+        const qa = window.__sitexr;
+        const l = qa.doors.leaves.find((x) => x.openable);
+        qa.doors.closeAll();
+        const c = l.centre();
+        return qa.doors.obstructs(c.x, c.y, c.z, 0.3);
+    });
+    check('a shut door blocks a teleport target', blocked === true);
+
+    const clears = await page.evaluate(async () => {
+        const qa = window.__sitexr;
+        const l = qa.doors.leaves.find((x) => x.openable);
+        const c0 = l.centre();
+        const where = { x: c0.x, y: c0.y, z: c0.z };
+        l.set(1);
+        for (let i = 0; i < 120; i++) qa.doors.update(1 / 60);
+        const c1 = l.centre();
+        return {
+            open: l.open,
+            blocked: qa.doors.obstructs(where.x, where.y, where.z, 0.3),
+            moved: +Math.hypot(c1.x - where.x, c1.z - where.z).toFixed(3),
+            culprit: qa.doors.leaves.filter((x) => x.obstructs(where.x, where.y, where.z, 0.3)).map((x) => x.label)
+        };
+    });
+    check('once open, the same spot is clear', clears.open === 1 && clears.blocked === false, JSON.stringify(clears));
+    await page.evaluate(() => window.__sitexr.doors.closeAll());
+    await settle(900);
+}
+
 // ---- exit --------------------------------------------------------------------------------
 await page.evaluate(() => window.__sitexr.rig.exitVr());
 await settle(2000);

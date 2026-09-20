@@ -29,6 +29,7 @@ const tmpV1 = new Vec3();
 const tmpV2 = new Vec3();
 const tmpV3 = new Vec3();
 const push = { x: 0, y: 0, z: 0 };
+const doorPush = new Vec3();
 
 const yawOf = (forward: Vec3) => Math.atan2(-forward.x, -forward.z) * math.RAD_TO_DEG;
 
@@ -108,6 +109,16 @@ export class XrRig {
 
     /** Surfaces controller rays can hit. */
     readonly interactables = new Set<Interactable>();
+
+    /**
+     * Movable obstacles, set by the app when a site has doors. The static collision mesh has
+     * open holes where the doorways are, so a shut leaf is the only thing standing there.
+     */
+    doors: {
+        resolve(x: number, y: number, z: number, r: number, dt: number, out: Vec3): boolean;
+        obstructs(x: number, y: number, z: number, r?: number): boolean;
+        update(dt: number): void;
+    } | null = null;
 
     /** While set, thumbstick locomotion and teleport are suspended (menus, tutorial prompts). */
     locked = false;
@@ -353,7 +364,8 @@ export class XrRig {
         const walkable = n.ny >= 0.6;
         const headroom = !this.collision.queryRay(point.x, point.y + 0.3, point.z, 0, 1, 0, 1.6);
         const free = this.collision.isFreeAt(point.x, point.y + 0.9, point.z);
-        if (!(inSite && walkable && headroom && free)) {
+        const doorClear = !this.doors?.obstructs(point.x, point.y + 0.9, point.z, 0.3);
+        if (!(inSite && walkable && headroom && free && doorClear)) {
             // mark invalid by returning a hit far outside the allowed distance
             return new Vec3(point.x, point.y - 1000, point.z);
         }
@@ -663,6 +675,14 @@ export class XrRig {
             const px = Math.abs(push.x) < 0.5 ? push.x : 0;
             const pz = Math.abs(push.z) < 0.5 ? push.z : 0;
             this.rig.setPosition(rigPos.x + px, rigPos.y, rigPos.z + pz);
+        }
+
+        // and out of any door that is still shut
+        if (this.doors?.resolve(head.x, floorY + 1.0, head.z, 0.3, dt, doorPush)) {
+            const rp = this.rig.getPosition();
+            const px = Math.abs(doorPush.x) < 0.5 ? doorPush.x : 0;
+            const pz = Math.abs(doorPush.z) < 0.5 ? doorPush.z : 0;
+            this.rig.setPosition(rp.x + px, rp.y, rp.z + pz);
         }
 
         const hx = this.camera.getPosition().x;
