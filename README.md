@@ -246,6 +246,29 @@ json instead. That also leaves the static collision mesh with open holes at ever
 which is the point: a shut leaf puts its own box back through `rig.doors`, and an open one
 takes it away. Without that split a door could only ever be scenery.
 
+### Doors from an FBX
+
+An IFC states which edge is hinged, how wide the leaf is and which way it swings. An FBX
+states none of that, so `tools/fbx-doors.py` works from the geometry and the element name:
+parts are grouped by the id in brackets, the leaf is the thin part, and a leaf and the glass
+in it share a footprint so they are treated as one piece. Sliding doors are left alone,
+because a pocket slider that swings is worse than one that does not move, and the name says
+plainly which is which.
+
+```sh
+python3 tools/fbx-doors.py model.fbx public/private/model-doors.json --scale 0.3048 --z-up
+node tools/reduce-glb.mjs raw.glb public/private/model.glb --cut public/private/model-doors.json
+```
+
+`--cut` is the part that matters. A leaf cannot both sit in the static mesh and swing, or
+opening it leaves a copy of itself behind. Names would be the tidy way to exclude it, but one
+of these models lost its names when it had to be flattened to export at all, so the cut works
+off geometry: every leaf's world box, and anything whose centroid falls inside one goes.
+
+What this does not recover is which edge hinges. With a pair of leaves it is not a guess, and
+with a single leaf it is, so every door produced this way is rendered shut and open and looked
+at before it ships.
+
 ### A design model has no lighting
 
 A splat carries the light it was captured in; a mesh model carries none. A single sun leaves

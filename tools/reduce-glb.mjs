@@ -60,6 +60,48 @@ const byCategory = process.argv.includes('--categories');
 const mute = process.argv.includes('--mute');
 
 /**
+ * --cut <doors.json>: drop the triangles that a doors file has taken over.
+ *
+ * A leaf cannot both sit in the static mesh and swing, or opening it leaves a copy of itself
+ * behind. Names would be the tidy way to exclude it, but one of these models lost its names
+ * when it had to be flattened to export at all, so this works off the geometry instead: every
+ * leaf's world box, and anything whose centroid falls inside one goes.
+ */
+const cutFile = (() => {
+    const i = process.argv.indexOf('--cut');
+    return i === -1 ? null : process.argv[i + 1];
+})();
+const cutBoxes = [];
+if (cutFile) {
+    const { readFileSync } = await import('node:fs');
+    const { leaves = [] } = JSON.parse(readFileSync(cutFile, 'utf8'));
+    for (const leaf of leaves) {
+        const [qx, qy, qz, qw] = leaf.rotation;
+        // quaternion to matrix, columns first
+        const m = [
+            1 - 2 * (qy * qy + qz * qz), 2 * (qx * qy + qz * qw), 2 * (qx * qz - qy * qw),
+            2 * (qx * qy - qz * qw), 1 - 2 * (qx * qx + qz * qz), 2 * (qy * qz + qx * qw),
+            2 * (qx * qz + qy * qw), 2 * (qy * qz - qx * qw), 1 - 2 * (qx * qx + qy * qy)
+        ];
+        const lo = [Infinity, Infinity, Infinity];
+        const hi = [-Infinity, -Infinity, -Infinity];
+        const p = leaf.positions;
+        for (let i = 0; i < p.length; i += 3) {
+            for (let k = 0; k < 3; k++) {
+                const w = m[k] * p[i] + m[3 + k] * p[i + 1] + m[6 + k] * p[i + 2] + leaf.position[k];
+                lo[k] = Math.min(lo[k], w);
+                hi[k] = Math.max(hi[k], w);
+            }
+        }
+        const pad = 0.05;
+        cutBoxes.push([lo.map((v) => v - pad), hi.map((v) => v + pad)]);
+    }
+    console.log(`cutting ${cutBoxes.length} door leaves out of the static mesh`);
+}
+const inCutBox = (x, y, z) =>
+    cutBoxes.some(([lo, hi]) => x > lo[0] && x < hi[0] && y > lo[1] && y < hi[1] && z > lo[2] && z < hi[2]);
+
+/**
  * Pull a colour toward something a person can stand inside.
  *
  * AutoCAD colour indices are pure primaries, and a wall of saturated yellow a metre from your
@@ -202,6 +244,7 @@ if (!keepMaterials) {
 // "Geometry_0". The nearest ancestor with a name that means something is the element.
 const GENERIC = /^(body|mesh|geometry|node|polygon mesh|solid|face set|composite part|root|scene)([\s_].*)?$|^$|\$assimpfbx\$/i;
 
+let cutTris = 0;
 const mergeByMaterial = () => {
     const groups = new Map();
     const visit = (node, parentMatrix, parentLabel) => {
@@ -257,10 +300,21 @@ const mergeByMaterial = () => {
                 }
             }
             const indices = prim.getIndices();
-            if (indices) {
-                for (let i = 0; i < indices.getCount(); i++) g.idx.push(g.base + indices.getScalar(i));
-            } else {
-                for (let i = 0; i < n; i++) g.idx.push(g.base + i);
+            const count = indices ? indices.getCount() : n;
+            const at = (i) => (indices ? indices.getScalar(i) : i);
+            for (let i = 0; i < count; i += 3) {
+                const a = at(i), b = at(i + 1), c = at(i + 2);
+                if (cutBoxes.length) {
+                    const base3 = g.base * 3;
+                    const cx = (g.pos[base3 + a * 3] + g.pos[base3 + b * 3] + g.pos[base3 + c * 3]) / 3;
+                    const cy = (g.pos[base3 + a * 3 + 1] + g.pos[base3 + b * 3 + 1] + g.pos[base3 + c * 3 + 1]) / 3;
+                    const cz = (g.pos[base3 + a * 3 + 2] + g.pos[base3 + b * 3 + 2] + g.pos[base3 + c * 3 + 2]) / 3;
+                    if (inCutBox(cx, cy, cz)) {
+                        cutTris++;
+                        continue;
+                    }
+                }
+                g.idx.push(g.base + a, g.base + b, g.base + c);
             }
             g.base += n;
         }
@@ -315,6 +369,7 @@ const mergeByMaterial = () => {
         const mesh = doc.createMesh(`merged-${key}`).addPrimitive(prim);
         scene.addChild(doc.createNode(`merged-${key}`).setMesh(mesh));
     }
+    if (cutTris) console.log(`removed ${cutTris.toLocaleString()} triangles taken over by door leaves`);
     console.log(`merged into ${groups.size} mesh(es), one per ${byCategory ? 'category' : 'material'}`);
     if (byCategory) console.log('  ' + [...groups.keys()].join(', '));
 };
