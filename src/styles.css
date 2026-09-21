@@ -242,3 +242,38 @@ button { font: inherit; color: inherit; }
     .hud-top { flex-direction: column; align-items: flex-start; gap: 8px; }
     .hud-hint { display: none; }
 }
+
+/* Watch mode: a quiet badge, so a projected view reads as live without competing with it. */
+.watch-badge {
+    position: fixed;
+    top: 14px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 30;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 7px 15px;
+    border-radius: 999px;
+    background: rgba(18, 20, 24, 0.82);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #e9ecf2;
+    font-size: 13px;
+    letter-spacing: 0.02em;
+    backdrop-filter: blur(6px);
+    pointer-events: none;
+}
+
+.watch-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: #f5a623;
+    box-shadow: 0 0 0 0 rgba(245, 166, 35, 0.55);
+    animation: watch-pulse 2s ease-out infinite;
+}
+
+@keyframes watch-pulse {
+    70% { box-shadow: 0 0 0 9px rgba(245, 166, 35, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(245, 166, 35, 0); }
+}

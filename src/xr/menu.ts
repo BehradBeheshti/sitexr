@@ -8,7 +8,7 @@ import { Panel, THEME, drawButton, drawPanelBackground, wrapText } from './panel
 import type { Button } from './panel';
 import type { XrRig } from './rig';
 
-type Page = 'main' | 'comfort' | 'about' | 'sites';
+type Page = 'main' | 'comfort' | 'about' | 'sites' | 'share';
 
 export type MenuActions = {
     tourActive: () => boolean;
@@ -16,6 +16,16 @@ export type MenuActions = {
     replayTutorial: () => void;
     /** Go to another site. Loading one ends the session, so this leaves VR on the way. */
     switchSite: (id: string) => void;
+    /** Put this viewpoint on a screen someone else is watching. */
+    share: {
+        available: boolean;
+        active: () => boolean;
+        code: () => string;
+        viewers: () => number;
+        watchUrl: (code: string) => string;
+        start: () => void;
+        stop: () => void;
+    };
     site: Site;
 };
 
@@ -98,6 +108,16 @@ export class VrMenu {
             case 'switch':
                 this.page = 'sites';
                 break;
+            case 'share':
+                this.page = 'share';
+                if (this.actions.share.available && !this.actions.share.active()) {
+                    this.actions.share.start();
+                }
+                break;
+            case 'sharestop':
+                this.actions.share.stop();
+                this.page = 'main';
+                break;
             case 'back':
                 this.page = 'main';
                 break;
@@ -133,6 +153,7 @@ export class VrMenu {
             if (this.page === 'main') this.drawMain(ctx, w, h);
             else if (this.page === 'comfort') this.drawComfort(ctx, w, h);
             else if (this.page === 'sites') this.drawSites(ctx, w, h);
+            else if (this.page === 'share') this.drawShare(ctx, w, h);
             else this.drawAbout(ctx, w, h);
         });
     }
@@ -148,6 +169,53 @@ export class VrMenu {
      * design models because they are for different people; in here the visitor is already
      * one of those people and just wants the other scene.
      */
+    /**
+     * The code a watcher types, in the largest type on any panel here: it has to be read
+     * across a room, through a headset, and said out loud correctly first time.
+     */
+    private drawShare(ctx: CanvasRenderingContext2D, w: number, h: number) {
+        drawPanelBackground(ctx, w, h, 'Share view');
+        const { share } = this.actions;
+        ctx.textAlign = 'center';
+
+        if (!share.available) {
+            ctx.fillStyle = THEME.text;
+            ctx.font = `600 30px ${THEME.font}`;
+            ctx.fillText('Not available on this address', w / 2, 200);
+            ctx.fillStyle = THEME.muted;
+            ctx.font = `400 23px ${THEME.font}`;
+            wrapText(ctx, 'Sharing needs the version of the site that can pass messages between two browsers. Static hosting cannot do it.', 80, 250, w - 160, 32);
+        } else if (share.active()) {
+            const code = share.code();
+            ctx.fillStyle = THEME.muted;
+            ctx.font = `400 24px ${THEME.font}`;
+            ctx.fillText('On any computer, open this site and enter', w / 2, 180);
+
+            ctx.fillStyle = THEME.accent;
+            ctx.font = `700 132px ${THEME.font}`;
+            ctx.fillText(code, w / 2, 320);
+
+            ctx.fillStyle = THEME.muted;
+            ctx.font = `400 21px ${THEME.font}`;
+            wrapText(ctx, share.watchUrl(code), 60, 380, w - 120, 28);
+
+            const n = share.viewers();
+            ctx.fillStyle = n > 0 ? THEME.text : THEME.muted;
+            ctx.font = `600 27px ${THEME.font}`;
+            ctx.fillText(n === 0 ? 'Nobody watching yet' : n === 1 ? '1 screen watching' : `${n} screens watching`, w / 2, 470);
+
+            const stop = this.button('sharestop', 48, h - 176, w - 96, 68);
+            drawButton(ctx, stop, 'Stop sharing', { hover: this.panel.hover === 'sharestop', size: 28 });
+        } else {
+            ctx.fillStyle = THEME.muted;
+            ctx.font = `400 26px ${THEME.font}`;
+            ctx.fillText('Opening a room\u2026', w / 2, 260);
+        }
+
+        const back = this.button('back', 48, h - 92, w - 96, 68);
+        drawButton(ctx, back, 'Back', { hover: this.panel.hover === 'back', size: 28 });
+    }
+
     private drawSites(ctx: CanvasRenderingContext2D, w: number, h: number) {
         drawPanelBackground(ctx, w, h, 'Switch site');
 
@@ -200,6 +268,7 @@ export class VrMenu {
             ['reset', 'Reset position'],
             ['tour', this.actions.tourActive() ? 'Stop guided tour' : 'Start guided tour'],
             ['comfort', 'Comfort settings'],
+            ['share', this.actions.share.active() ? 'Sharing view\u2026' : 'Share view'],
             ['about', 'About & credits'],
             ['switch', 'Switch site'],
             ['exit', 'Exit VR', true]

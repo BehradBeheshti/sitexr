@@ -14,7 +14,12 @@
     "assets": "bash tools/build-scene.sh",
     "controllers": "node tools/sync-controller-profiles.mjs",
     "test:vr": "node tools/xr-test.mjs",
-    "test:all": "VITE_INCLUDE_PRIVATE=1 npm run build && node tools/smoke-test.mjs && node tools/xr-test.mjs excavator && node tools/xr-test.mjs komatsu && node tools/xr-test.mjs scaffold && node tools/xr-test.mjs office"
+    "test:all": "VITE_INCLUDE_PRIVATE=1 npm run build && node tools/smoke-test.mjs && node tools/xr-test.mjs excavator && node tools/xr-test.mjs komatsu && node tools/xr-test.mjs scaffold && node tools/xr-test.mjs office",
+    "test:share": "VITE_INCLUDE_PRIVATE=1 VITE_RELAY=1 npm run build && node tools/share-test.mjs --site office",
+    "dev:cf": "VITE_RELAY=1 npm run build && wrangler dev",
+    "deploy:cf": "npm run build:cf && wrangler deploy",
+    "models": "node tools/fetch-models.mjs",
+    "build:cf": "node tools/fetch-models.mjs && VITE_INCLUDE_PRIVATE=1 VITE_RELAY=1 npm run build"
   },
   "dependencies": {
     "playcanvas": "^2.22.1"
@@ -29,7 +34,8 @@
     "iwer": "^2.4.0",
     "puppeteer-core": "^25.11.0",
     "typescript": "^5.9.3",
-    "vite": "^7.1.0"
+    "vite": "^7.1.0",
+    "wrangler": "^4.136.1"
   },
   "engines": {
     "node": ">=20"

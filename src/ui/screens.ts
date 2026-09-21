@@ -46,6 +46,13 @@ export class Screens {
         $('enter').addEventListener('click', () => cb.onEnter());
         $('open-settings').addEventListener('click', () => this.openModal('modal-settings'));
         $('open-credits').addEventListener('click', () => this.openModal('modal-credits'));
+        $('open-watch').addEventListener('click', () => {
+            const code = (window.prompt('Enter the code shown in the headset') ?? '').trim().toUpperCase();
+            if (!code) return;
+            const url = new URL(location.href);
+            url.searchParams.set('watch', code);
+            location.href = url.toString();
+        });
         $('hud-tour').addEventListener('click', () => cb.onTour());
         $('hud-reset').addEventListener('click', () => cb.onReset());
         $('hud-menu').addEventListener('click', () => this.openModal('modal-settings'));
@@ -136,6 +143,42 @@ export class Screens {
                 ? 'All sites'
                 : (MODES.find((x) => x.id === this.mode)?.name ?? '');
             this.renderSites();
+        }
+    }
+
+    // ---- watch mode --------------------------------------------------------------------------
+
+    /**
+     * A projected second screen: no controls, no hints, just the badge. The watcher is not a
+     * visitor and should not be offered anything to press.
+     */
+    /** Offer the watch entry point only where a relay can actually be reached. */
+    setWatchOffered(offered: boolean) {
+        $('open-watch').hidden = !offered;
+    }
+
+    setWatching(code: string) {
+        this.hideWelcome();
+        $('watch-badge').hidden = false;
+        $('watch-text').textContent = `Watching \u00b7 ${code}`;
+        $('hud-hint').hidden = true;
+        $('hud-site').hidden = true;
+        $('hud-reset').hidden = true;
+        $('hud-tour').hidden = true;
+    }
+
+    setWatchStatus(status: { kind: string; code?: string; message?: string }) {
+        const text = $('watch-text');
+        const badge = $('watch-badge');
+        if (status.kind === 'waiting') {
+            badge.hidden = false;
+            text.textContent = `Waiting for ${status.code ?? ''} to start`;
+        } else if (status.kind === 'watching') {
+            badge.hidden = false;
+            text.textContent = `Watching \u00b7 ${status.code ?? ''}`;
+        } else if (status.kind === 'error') {
+            badge.hidden = false;
+            text.textContent = status.message ?? 'Cannot reach the relay';
         }
     }
 

@@ -1,0 +1,17 @@
+{
+    "$schema": "node_modules/wrangler/config-schema.json",
+    "name": "sitexr",
+    "main": "worker/index.js",
+    "compatibility_date": "2026-09-01",
+    "assets": {
+        "directory": "./dist",
+        "binding": "ASSETS",
+        "not_found_handling": "404-page"
+    },
+    "durable_objects": {
+        "bindings": [{ "name": "SHARE_ROOM", "class_name": "ShareRoom" }]
+    },
+    // SQLite-backed Durable Objects are the ones included on the free plan
+    "migrations": [{ "tag": "v1", "new_sqlite_classes": ["ShareRoom"] }],
+    "observability": { "enabled": true }
+}

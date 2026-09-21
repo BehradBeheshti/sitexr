@@ -324,6 +324,54 @@ ready, with no DOM click, which they cannot give while wearing it. Where that ca
 available the welcome screen is already up with its Enter button, so the fallback is one
 press rather than four.
 
+## Showing a headset session on a screen
+
+One person walks the model in the headset; everyone else watches it live on a laptop or a
+projector, by opening the same URL. Nothing to install and nothing to start.
+
+The watcher does not receive a picture. Both machines already have the model, because both
+loaded the same site, so only the viewpoint travels: position, facing, which doors are open,
+which note is up. That is about eighty bytes fifteen times a second, against megabits for
+video. It costs the headset nothing to send, where casting has to encode a video stream and
+takes frame rate to do it, and the watcher draws at their own screen's resolution instead of
+watching a compressed copy of one eye.
+
+In the headset: **B → Share view**, and a four-letter code appears. On the laptop: open the
+site, click **Watch a live session**, type the code. Or skip both and open `?watch=CODE`
+directly, so the projector is already waiting before the headset goes on.
+
+### Why this needs a host that runs code
+
+Two browsers cannot introduce themselves to each other. GitHub Pages only hands out files, so
+there is nowhere for the headset and the laptop to meet. `worker/index.js` is that meeting
+point: it serves exactly the same build and adds `/relay/<code>`, a WebSocket room held open
+by a Durable Object. The room passes the presenter's messages to the watchers and nothing
+else. The model never goes through it.
+
+```sh
+npm run dev:cf       # the Worker, the room and the site, locally
+npm run test:share   # two browsers, one relay, end to end
+npm run deploy:cf    # fetch the models, build, deploy
+```
+
+`test:share` starts its own `wrangler dev` and stops it afterwards. That is not tidiness:
+wrangler snapshots the asset list when it boots, so a server left running across a rebuild
+serves an index.html pointing at a bundle that no longer exists.
+
+Sharing is a build-time fact, not a probe: the Cloudflare build sets `VITE_RELAY=1` and the
+static one does not. Asking the server on every page load cost a request that 404s on static
+hosting, and a visitor should not see a failed request on a site working exactly as intended.
+
+### Two traps, both of which made it look broken
+
+The state travels nested under `v` rather than spread into the envelope. Spreading it once let
+a field named `t` (the tour stop) overwrite the envelope's own `t` (the message type), and
+every watcher silently ignored every packet while the relay logs looked perfect.
+
+The presenter samples from the engine's update **and** from a timer. The update rides on
+animation frames, which a browser stops entirely for a page that is not in front, so a
+presenter who tabs away would vanish rather than go quiet.
+
 ## Capturing images for figures
 
 `tools/capture-figures.mjs` renders a large still set from the built site: for every site the

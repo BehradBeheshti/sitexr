@@ -9,6 +9,8 @@ import { BUDGETS, FOVEATION, settings } from './settings';
 import { Screens } from './ui/screens';
 import { createViewer } from './vendor/supersplat-viewer/index';
 import type { Collision } from './vendor/supersplat-viewer/collision';
+import { RELAY_ENABLED, ShareHost, ShareViewer } from './share/session';
+import type { ShareState, ShareStatus } from './share/session';
 import { DoorSet } from './xr/doors';
 import { GridCollision } from './xr/grid-collision';
 import { collisionFromModel } from './xr/model-collision';
@@ -45,10 +47,16 @@ type Session = {
     enterVr: () => Promise<void>;
     enterDesktop: () => void;
     dispose: () => void;
+    /** Take over the camera from a shared viewpoint (watch mode). */
+    follow: (state: ShareState) => void;
+    /** Publish this session's viewpoint, or stop. */
+    share: ShareHost;
 };
 
 const main = async () => {
     const vrSupported = await detectVr();
+    // set by the build, not discovered at run time; see RELAY_ENABLED
+    const relayOk = RELAY_ENABLED;
     let session: Session | null = null;
     let starting: Promise<Session> | null = null;
 
@@ -184,8 +192,62 @@ const main = async () => {
 
     /** Called once a newly loaded site is drawable. */
     const onSiteReady = async () => {
+        if (watchCode) {
+            watching = false;
+            const last = watcher?.last;
+            if (last && last.s === selected.id && session) {
+                watching = true;
+                session.enterDesktop();
+                screens.setWatching(watchCode);
+                session.follow(last);
+            }
+            return;
+        }
         await offerVrAgain();
     };
+
+    // ---- watch mode ----------------------------------------------------------------------
+    // `?watch=CODE` turns this tab into a second screen: it loads whatever site the presenter
+    // is in, hands the camera to them, and takes no input of its own. Nothing to install and
+    // nothing to start, which is the whole point of putting it in the site.
+    const watchCode = (params.get('watch') ?? '').trim().toUpperCase();
+    let watcher: ShareViewer | null = null;
+
+    const startWatching = (code: string) => {
+        watcher = new ShareViewer(code);
+        // a support handle: "is anything arriving?" is the first question when a projected
+        // view stays blank, and it is not answerable from the outside
+        const diag = { code, received: 0, lastAt: 0, following: false };
+        Object.defineProperty(window, '__sitexrWatch', { value: diag, configurable: true });
+        watcher.onStatus = (st) => screens.setWatchStatus(st);
+        watcher.onState = (shared) => {
+            diag.received++;
+            diag.lastAt = Date.now();
+            // A late-joining watcher may be on the wrong site, so follow the presenter there.
+            // Guarded, because these arrive fifteen times a second and an unguarded switch
+            // would cancel its own load over and over.
+            if (shared.s !== selected.id) {
+                if (!switchingTo) {
+                    switchingTo = shared.s;
+                    void selectSite(shared.s).finally(() => {
+                        switchingTo = null;
+                    });
+                }
+                return;
+            }
+            if (!session) return;
+            if (!watching) {
+                watching = true;
+                session.enterDesktop();
+                screens.setWatching(code);
+            }
+            diag.following = true;
+            session.follow(shared);
+        };
+        watcher.start();
+    };
+    let watching = false;
+    let switchingTo: string | null = null;
 
     const enter = async () => {
         if (!session) return;
@@ -333,10 +395,46 @@ const main = async () => {
                 'Drag to look \u00b7 click the ground to walk there \u00b7 W A S D to move \u00b7 click a door to open it';
         }
 
+        // ---- sharing this viewpoint ------------------------------------------------------
+        // Fifteen samples a second of where the head is and what has been touched. The model
+        // is already on the watcher's machine, so this is all that has to travel.
+        const shareHost = new ShareHost(() => {
+            const p = rig.camera.getPosition();
+            const f = rig.camera.forward;
+            const state: ShareState = {
+                s: site.id,
+                p: [+p.x.toFixed(3), +p.y.toFixed(3), +p.z.toFixed(3)],
+                f: [+f.x.toFixed(4), +f.y.toFixed(4), +f.z.toFixed(4)]
+            };
+            if (doors) state.d = doors.leaves.map((l) => +l.open.toFixed(2));
+            state.c = markers.cardOpen ? (markers.openPoiId ?? null) : null;
+            state.t = tour.active ? tour.index : null;
+            return state;
+        });
+
+        app.on('update', () => shareHost.tick());
+
+        // the code panel shows a live count, so it has to repaint when someone joins
+        shareHost.onStatus = () => {
+            if (menu.isOpen && menu.page === 'share') menu.render();
+        };
+
         const menu = new VrMenu(rig, {
             tourActive: () => tour.active,
             toggleTour: () => tour.toggle(),
             replayTutorial: () => tutorial.start(),
+            share: {
+                available: relayOk,
+                active: () => shareHost.active,
+                code: () => shareHost.code,
+                viewers: () => shareHost.viewers,
+                watchUrl: (code: string) =>
+                    `${location.origin}${location.pathname}?watch=${code}`,
+                start: () => {
+                    void shareHost.start().then(() => menu.render()).catch(() => menu.render());
+                },
+                stop: () => shareHost.stop()
+            },
             switchSite: (id: string) => {
                 void (async () => {
                     // Fade out first, but never wait on it: the fade resolves from the render
@@ -530,13 +628,46 @@ const main = async () => {
 
         // Non-enumerable QA handle for the headless smoke test (not a user-facing control).
         Object.defineProperty(window, '__sitexr', {
-            value: { viewer, rig, menu, tutorial, markers, tour, settings, doors, pois: site.pois, site },
+            value: { viewer, rig, menu, tutorial, markers, tour, settings, doors, share: shareHost, pois: site.pois, site },
             enumerable: false,
             configurable: true
         });
 
+        // The watcher's camera chases the shared pose rather than snapping to it, so a
+        // dropped packet reads as a slight lag instead of a jolt.
+        const followTarget = { p: new Vec3(), f: new Vec3(0, 0, -1), have: false };
+        const followNow = { p: new Vec3(), f: new Vec3(0, 0, -1), started: false };
+        const lookAt = new Vec3();
+        let following = false;
+
+        app.on('update', (dt: number) => {
+            if (!following || !followTarget.have) return;
+            const k = followNow.started ? 1 - Math.exp(-dt * 12) : 1;
+            followNow.started = true;
+            followNow.p.lerp(followNow.p, followTarget.p, k);
+            followNow.f.lerp(followNow.f, followTarget.f, k);
+            if (followNow.f.lengthSq() < 1e-6) followNow.f.set(0, 0, -1);
+            followNow.f.normalize();
+            lookAt.copy(followNow.f).mulScalar(12).add(followNow.p);
+            const cm = viewer.internals.cameraManager();
+            cm.camera.look(followNow.p, lookAt);
+            cm.snap();
+            app.renderNextFrame = true;
+        });
+
         return {
             site,
+            share: shareHost,
+            follow: (shared: ShareState) => {
+                following = true;
+                state.inputEnabled = false;
+                followTarget.p.set(shared.p[0], shared.p[1], shared.p[2]);
+                followTarget.f.set(shared.f[0], shared.f[1], shared.f[2]);
+                followTarget.have = true;
+                if (shared.d && doors) {
+                    shared.d.forEach((v, i) => doors?.leaves[i]?.set(v));
+                }
+            },
             enterVr: () => rig.enterVr(),
             enterDesktop: () => {
                 desktopMode = true;
@@ -560,8 +691,10 @@ const main = async () => {
         };
     };
 
+    screens.setWatchOffered(relayOk && !watchCode);
     syncUrl();
     await startSelected();
+    if (watchCode) startWatching(watchCode);
 };
 
 const errorText = (err: unknown) => {

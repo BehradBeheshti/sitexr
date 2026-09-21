@@ -140,6 +140,11 @@ export class Markers {
         if (!v) this.closeCard();
     }
 
+    /** Which note is open, if any. */
+    get openPoiId(): string | null {
+        return this.openPoi?.id ?? null;
+    }
+
     get cardOpen() {
         return this.card.visible;
     }
