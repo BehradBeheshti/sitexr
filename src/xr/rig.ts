@@ -28,6 +28,9 @@ export type ButtonName = keyof typeof BUTTON;
 const tmpV1 = new Vec3();
 const tmpV2 = new Vec3();
 const tmpV3 = new Vec3();
+/** How far above the floor the right thumbstick will lift a visitor. */
+const MAX_HEIGHT = 40;
+
 const push = { x: 0, y: 0, z: 0 };
 const doorPush = new Vec3();
 
@@ -47,6 +50,22 @@ class SiteXrNavigation extends (XrNavigation as any) {
      * stick and go where you are looking. Steering with the hand instead lets you walk one
      * way while looking another, which some people much prefer on a site.
      */
+    /**
+     * The engine translates the rig outright here. We only want the gesture: terrain
+     * following owns the height, so it has to be told rather than fought with.
+     */
+    _handleSnapVertical(inputSource: XrInputSource) {
+        const gp = inputSource.gamepad;
+        if (!gp || !this.onVertical) return;
+        const dir = this._snapTrigger(
+            this._verticalSnap,
+            -gp.axes[3],
+            this.snapVerticalThreshold,
+            this.snapVerticalResetThreshold
+        );
+        if (dir) this.onVertical(dir, !!gp.buttons[1]?.pressed);
+    }
+
     _handleMovement(inputSource: XrInputSource, dt: number) {
         if (this.steering !== 'controller') {
             super._handleMovement(inputSource, dt);
@@ -158,6 +177,13 @@ export class XrRig {
     /** Visitors are kept within this radius of the scene origin. */
     walkRadius: number;
 
+    /**
+     * Metres held above the floor, from the right thumbstick. Zero means standing on it.
+     * Above zero the visitor is hovering, which is the only sensible way through a model
+     * that is seven floors of steel.
+     */
+    heightOffset = 0;
+
     private onSettings: () => void;
 
     constructor(
@@ -181,7 +207,18 @@ export class XrRig {
         // navigation script (the viewer already gave the rig a script component)
         if (!this.rig.script) this.rig.addComponent('script');
         this.nav = this.rig.script.create(SiteXrNavigation as any);
-        this.nav.enableSnapVertical = false;
+        // The engine's vertical snap moves the rig outright, which terrain following then
+        // undoes on the next frame. Routed through a held offset instead, it sticks: rise to
+        // the third floor of a frame and walk around up there.
+        this.nav.enableSnapVertical = true;
+        this.nav.snapVerticalHeight = 0.6;
+        this.nav.snapVerticalBoostHeight = 2.5;
+        this.nav.onVertical = (dir: number, boost: boolean) => {
+            const by = dir * (boost ? 2.5 : 0.6);
+            this.heightOffset = Math.max(0, Math.min(MAX_HEIGHT, this.heightOffset + by));
+            if (this.heightOffset < 0.12) this.heightOffset = 0;
+            this.haptic('right', 0.3, 18);
+        };
         this.nav.maxTeleportDistance = 12;
         this.nav.teleportArcSpeed = 9;
         this.nav.validTeleportColor = new Color(0.96, 0.65, 0.14);
@@ -413,6 +450,7 @@ export class XrRig {
     }
 
     resetToSpawn(blink = true): Promise<void> {
+        this.heightOffset = 0;
         const stand = this.findStand(this.spawn.x, this.spawn.z, this.spawn.floor);
         if (blink) return this.blinkTo(stand.x, stand.y, stand.z, this.spawn.look);
         this.placeHead(stand.x, stand.y, stand.z, this.spawn.look);
@@ -693,7 +731,10 @@ export class XrRig {
 
         const inSite = Math.hypot(hx, hz) <= this.walkRadius;
         const step = ground !== null && this.lastGround !== null ? ground - this.lastGround : 0;
-        const ok = ground !== null && inSite && (settling || step < 0.55);
+        const hovering = this.heightOffset > 0.05;
+        // Hovering, the floor below is scenery: a missing one is a void to fly over, and a
+        // step up is something to clear rather than a wall.
+        const ok = inSite && (hovering || (ground !== null && (settling || step < 0.55)));
 
         if (!ok) {
             if (this.lastSafe.valid) {
@@ -706,12 +747,13 @@ export class XrRig {
 
         // spring the floor toward the terrain; snap when settling after a placement
         const k = settling ? 1 : 1 - Math.exp(-dt * 9);
-        const newY = floorY + (ground - floorY) * k;
+        const target = (ground ?? this.lastGround ?? floorY) + this.heightOffset;
+        const newY = floorY + (target - floorY) * k;
         const rp = this.rig.getPosition();
         this.rig.setPosition(rp.x, newY, rp.z);
-        this.lastGround = ground;
-        this.lastSafe = { x: hx, z: hz, ground, valid: true };
-        if (this.nav) this.nav._currentGroundY = ground;
+        if (ground !== null) this.lastGround = ground;
+        if (ground !== null) this.lastSafe = { x: hx, z: hz, ground, valid: true };
+        if (this.nav && ground !== null) this.nav._currentGroundY = ground;
     }
 }
 

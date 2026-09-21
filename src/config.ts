@@ -114,6 +114,8 @@ export type Site = {
     collision: { type: 'voxel' | 'grid' | 'mesh'; url: string };
     /** Openable door leaves extracted from the source model by `tools/ifc-doors.py`. */
     doors?: { url: string };
+    /** A flight of stairs worth testing: walk from `from` to `to` and expect to gain `rise`. */
+    stair?: { from: [number, number]; to: [number, number]; rise: number };
     /** Metres per scene unit. */
     worldScale: number;
     /** Arrival point, look target and an approximate floor height for the first camera. */
@@ -320,6 +322,7 @@ const officeBuilding: Site = {
     model: { url: 'private/office-building.glb' },
     collision: { type: 'mesh', url: 'private/office-building.glb' },
     doors: { url: 'private/office-doors.json' },
+    stair: { from: [5.2, 2.75], to: [2.0, 2.75], rise: 1.6 },
     worldScale: 1,
     // The atrium, not the approach: the storefront doors are modelled as solid glass, so a
     // visitor who arrived outside could see in but never walk in.
@@ -467,6 +470,7 @@ const design1: Site = {
     model: { url: 'private/design1.glb' },
     collision: { type: 'mesh', url: 'private/design1.glb' },
     doors: { url: 'private/design1-doors.json' },
+    stair: { from: [12.4, -2.4], to: [12.4, 2.4], rise: 2.0 },
     worldScale: 1,
     spawn: { x: 0, z: 2, floor: 0, look: [8, 1.5, 6] },
     walkRadius: 70,

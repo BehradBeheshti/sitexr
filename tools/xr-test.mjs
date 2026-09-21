@@ -481,6 +481,54 @@ const roomAfter = await headState();
 const moved = Math.hypot(roomAfter.x - roomBefore.x, roomAfter.z - roomBefore.z);
 check('physical head movement moves the view (room scale)', moved > 0.3, `moved ${moved.toFixed(2)} m`);
 
+// ---- stairs and height --------------------------------------------------------------------
+// A site declares `stair` when it has one worth climbing; the rest only get the height test.
+const stair = await page.evaluate(() => window.__sitexr.site.stair ?? null);
+if (stair) {
+    const climbed = await page.evaluate(async ({ from, to }) => {
+        const qa = window.__sitexr;
+        qa.rig.heightOffset = 0;
+        const stand = qa.rig.findStand(from[0], from[1], qa.site.spawn.floor);
+        qa.rig.placeHead(stand.x, stand.y, stand.z, [to[0], stand.y + 1, to[1]]);
+        await new Promise((r) => setTimeout(r, 600));
+        const start = qa.rig.camera.getPosition().y;
+
+        // walk the flight in small steps, letting the floor follow between each
+        const n = 40;
+        for (let i = 1; i <= n; i++) {
+            const x = from[0] + ((to[0] - from[0]) * i) / n;
+            const z = from[1] + ((to[1] - from[1]) * i) / n;
+            const head = qa.rig.camera.getPosition();
+            const rig = qa.rig.rig.getPosition();
+            qa.rig.rig.setPosition(rig.x + (x - head.x), rig.y, rig.z + (z - head.z));
+            await new Promise((r) => setTimeout(r, 60));
+        }
+        return { start: +start.toFixed(2), end: +qa.rig.camera.getPosition().y.toFixed(2) };
+    }, stair);
+    const rise = climbed.end - climbed.start;
+    check(`walking the stair carries the visitor up (${stair.rise} m expected)`,
+        rise > stair.rise * 0.6, `rose ${rise.toFixed(2)} m, ${JSON.stringify(climbed)}`);
+}
+
+const height = await page.evaluate(async () => {
+    const qa = window.__sitexr;
+    qa.rig.resetToSpawn(false);
+    await new Promise((r) => setTimeout(r, 900));
+    const floor = qa.rig.camera.getPosition().y;
+    qa.rig.nav.onVertical(1, true);
+    qa.rig.nav.onVertical(1, true);
+    await new Promise((r) => setTimeout(r, 1400));
+    const up = qa.rig.camera.getPosition().y;
+    qa.rig.resetToSpawn(false);
+    await new Promise((r) => setTimeout(r, 900));
+    return { floor: +floor.toFixed(2), up: +up.toFixed(2), back: +qa.rig.camera.getPosition().y.toFixed(2),
+             offset: qa.rig.heightOffset };
+});
+check('the right thumbstick lifts the visitor and the lift holds', height.up - height.floor > 3,
+    `${height.floor} -> ${height.up}`);
+check('resetting puts the visitor back on the floor',
+    Math.abs(height.back - height.floor) < 0.6 && height.offset === 0, JSON.stringify(height));
+
 // ---- doors, when the site has them --------------------------------------------------------
 const hasDoors = await page.evaluate(() => !!window.__sitexr.doors);
 if (hasDoors) {
