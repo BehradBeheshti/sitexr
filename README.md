@@ -249,7 +249,17 @@ takes it away. Without that split a door could only ever be scenery.
 ### Doors from an FBX
 
 An IFC states which edge is hinged, how wide the leaf is and which way it swings. An FBX
-states none of that, so `tools/fbx-doors.py` works from the geometry and the element name:
+states none of that, so `tools/fbx-doors.py` works from the geometry and the element name.
+
+Two things it has to know, both learned the hard way. A Revit door family rarely contains the
+word "door": Clash Detection 2 calls every one of its 22 doors `Single-Flush`, and matching on
+"door" found two storefronts and missed the lot. And the leaf is not the thinnest part of a
+door, because these have 50 mm leaves inside 30 mm trims. What the family name does state is
+the leaf size, `36_ x 96_` in inches or `800 x 2100` in millimetres, and the part matching that
+is the leaf. Sidelights, mullions and curtain-wall panels are excluded by name: they sit in an
+opening and are not doors.
+
+It works from:
 parts are grouped by the id in brackets, the leaf is the thin part, and a leaf and the glass
 in it share a footprint so they are treated as one piece. Sliding doors are left alone,
 because a pocket slider that swings is worse than one that does not move, and the name says

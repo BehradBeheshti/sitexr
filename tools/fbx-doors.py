@@ -37,7 +37,18 @@ a = ap.parse_args()
 GENERIC = re.compile(r'\$AssimpFbx\$|^Body$|^Composite Part$|^Polygon Mesh$|^Solid$|'
                      r'^\d*D? ?(Solid|Face Set)$|^Geometry_\d+$|^$', re.I)
 SLIDING = re.compile(r'slider|sliding|pocket', re.I)
-DOOR = re.compile(r'\bdoor', re.I)
+
+# A Revit door family rarely has the word "door" in its name. Missing that cost a whole
+# model's worth of them: Clash Detection 2 calls every one of its doors "Single-Flush".
+DOOR = re.compile(
+    r'\bdoor|single-?flush|double-?flush|bi-?fold|store\s*front|overhead\s*door|'
+    r'single-?panel|double-?panel|single-?raised|flush\s*door',
+    re.I
+)
+
+# Things that sit in an opening and are not a door. A sidelight is fixed glass beside a
+# door and a curtain-wall panel is a wall; neither should swing.
+NOT_A_DOOR = re.compile(r'sidelight|system\s*panel|louver|louvre|\bwindow\b|mullion|transom', re.I)
 
 PRE = np.eye(4)
 PRE[:3, :3] *= a.scale
@@ -61,6 +72,24 @@ def quat_from_matrix(m):
     return [(m[0, 2] + m[2, 0]) / s, (m[1, 2] + m[2, 1]) / s, 0.25 * s, (m[1, 0] - m[0, 1]) / s]
 
 
+SIZE_IN_NAME = re.compile(r'(\d{2,4})\s*["_\u2033]?\s*[xX\u00d7]\s*(\d{2,4})\s*["_\u2033]?')
+
+
+def nominal_size(name):
+    """The leaf size a door family states in its own name, in metres.
+
+    Revit writes it two ways: `36_ x 96_` for inches, `800 x 2100` for millimetres. Both
+    numbers above 100 means millimetres; there is no 100-inch door.
+    """
+    m = SIZE_IN_NAME.search(name)
+    if not m:
+        return None
+    a, b = int(m.group(1)), int(m.group(2))
+    if a > 100 and b > 100:
+        return a / 1000, b / 1000
+    return a * 0.0254, b * 0.0254
+
+
 def normals_of(v, idx):
     n = np.zeros_like(v)
     tri = v[idx]
@@ -81,7 +110,7 @@ with pyassimp.load(a.src) as scene:
             label = name
         for mesh in node.meshes:
             v = np.array(mesh.vertices)
-            if not len(v) or not DOOR.search(label):
+            if not len(v) or not DOOR.search(label) or NOT_A_DOOR.search(label):
                 continue
             world = (np.c_[v, np.ones(len(v))] @ m.T)[:, :3]
             world = (PRE[:3, :3] @ world.T).T + PRE[:3, 3]
@@ -122,6 +151,32 @@ for (family, ident), pieces in parts.items():
     if not candidates:
         skipped.append((family, 'no part looks like a leaf'))
         continue
+
+    # The family name states the leaf size, and that is the only reliable way to tell the
+    # leaf from the trim around it. Thickness is not: these doors have 50 mm leaves inside
+    # 30 mm trims, so picking the thinnest part picks the frame, and merging all three gave
+    # a 235 mm "leaf" that swung its own frame with it.
+    nominal = nominal_size(family)
+    if nominal:
+        want_w, want_h = nominal
+        scored = []
+        for verts, faces, sz in candidates:
+            got_w = max(sz[0], sz[2])
+            err = abs(got_w - want_w) / want_w + abs(sz[1] - want_h) / want_h
+            scored.append((err, verts, faces, sz))
+        best = min(e for e, _, _, _ in scored)
+        if best > 0.25:
+            skipped.append((family, f'no part matches its stated {want_w:.2f} x {want_h:.2f} m'))
+            continue
+        candidates = [(v, f, sz) for e, v, f, sz in scored if e <= best + 0.04]
+    else:
+        thinnest = min(min(sz[0], sz[2]) for _, _, sz in candidates)
+        limit = thinnest * 2.2 + 0.015
+        kept = [c for c in candidates if min(c[2][0], c[2][2]) <= limit]
+        if not kept:
+            skipped.append((family, 'no thin leaf among its parts'))
+            continue
+        candidates = kept
 
     # A leaf and the glass in it are separate parts sitting in the same place. Left apart
     # they would swing away from each other, so anything sharing a footprint is one leaf.
