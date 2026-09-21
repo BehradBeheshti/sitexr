@@ -34,6 +34,41 @@ const EYE = 1.65;
 // t: seconds. pos is (x, z) in metres; look is a world point. `cut` starts a new shot,
 // which the blink (fade to black) covers.
 const SHOTS = {
+    office: {
+        title: 'Office Building',
+        keys: [
+            // the atrium, looking up the stair
+            { t: 0.0, x: 8.3, z: 0.3, floor: 0, look: [3.4, 1.6, 2.2] },
+            { t: 2.2, x: 7.5, z: 0.3, floor: 0, look: [3.4, 2.6, 2.2] },
+            { t: 4.2, x: 6.7, z: 0.4, floor: 0, look: [3.2, 2.9, 2.4] },
+
+            // the same spot one floor up, at the guardrail
+            { t: 4.8, x: 8.3, z: 0.3, floor: 3.66, look: [3.4, 3.2, 2.2], cut: true },
+            { t: 7.0, x: 7.6, z: -0.6, floor: 3.66, look: [2.0, 2.2, 1.6] },
+            { t: 8.8, x: 7.6, z: -0.6, floor: 3.66, look: [1.0, 3.6, 6.0] },
+
+            // up to the glazed entrance, from inside. The two leaves part in the middle,
+            // so the walk keeps to z = 8.4 and goes between them.
+            { t: 9.4, x: 1.6, z: 8.4, floor: 0, look: [7.46, 1.6, 8.4], cut: true },
+            { t: 12.4, x: 3.8, z: 8.4, floor: 0, look: [7.46, 1.6, 8.4] },
+            { t: 15.4, x: 3.9, z: 8.4, floor: 0, look: [7.46, 1.6, 8.4] },   // they swing here
+            { t: 19.0, x: 10.8, z: 9.4, floor: 0, look: [4.0, 3.0, 5.5] },   // and we walk through, turning
+
+            // outside, on the approach
+            { t: 19.6, x: -9.0, z: 11.0, floor: 0, look: [4.0, 2.2, 8.8], cut: true },
+            { t: 21.8, x: -10.5, z: 12.0, floor: 0, look: [-6.0, 3.0, 7.0] },
+            { t: 23.4, x: -12.0, z: 13.0, floor: 0, look: [-19.0, 2.5, 4.0] },
+
+            // back inside, and open the menu
+            { t: 24.0, x: 8.3, z: 0.3, floor: 0, look: [3.4, 1.7, 2.2], cut: true },
+            { t: 27.8, x: 8.3, z: 0.3, floor: 0, look: [3.4, 1.7, 2.2] }
+        ],
+        events: [
+            { t: 12.9, do: 'doors', leaves: [6, 7], open: 1 },
+            { t: 24.6, do: 'menu' },
+            { t: 26.0, do: 'menuPage', page: 'sites' }
+        ]
+    },
     komatsu: {
         title: 'Heavy Plant Yard',
         keys: [
@@ -106,7 +141,7 @@ if (!shot) {
     console.error(`no shot list for site "${siteId}"`);
     process.exit(1);
 }
-const duration = shot.keys[shot.keys.length - 1].t;
+const duration = Number(arg('seconds', shot.keys[shot.keys.length - 1].t));
 
 // ---- timeline ------------------------------------------------------------------------
 const yawPitch = (x, y, z, look) => {
@@ -135,15 +170,15 @@ const poseAt = (t, groundOf) => {
     const u = b.cut ? 0 : smooth(Math.min(1, Math.max(0, (t - a.t) / span)));
     const x = a.x + (b.x - a.x) * u;
     const z = a.z + (b.z - a.z) * u;
-    const ya = yawPitch(a.x, groundOf(a.x, a.z) + EYE, a.z, a.look);
-    const yb = yawPitch(b.x, groundOf(b.x, b.z) + EYE, b.z, b.look);
+    const ya = yawPitch(a.x, groundOf(a.x, a.z, a.floor) + EYE, a.z, a.look);
+    const yb = yawPitch(b.x, groundOf(b.x, b.z, b.floor) + EYE, b.z, b.look);
     const yaw = ya.yaw + shortest(ya.yaw, yb.yaw) * u;
     const pitch = ya.pitch + (yb.pitch - ya.pitch) * u;
     // head motion: a walking bob while the position changes, plus a slow idle sway
     const moving = Math.hypot(b.x - a.x, b.z - a.z) > 0.2 && u > 0.01 && u < 0.99;
     const bob = (moving ? 0.022 * Math.sin(t * Math.PI * 2 * 1.7) : 0.006 * Math.sin(t * Math.PI * 2 * 0.5));
     const sway = 0.35 * Math.sin(t * Math.PI * 2 * 0.23) + (moving ? 0.5 * Math.sin(t * Math.PI * 2 * 0.85) : 0);
-    return { x, z, yaw: yaw + sway, pitch: pitch + (moving ? 0.35 * Math.sin(t * Math.PI * 2 * 1.7 + 1) : 0), bob };
+    return { x, z, floor: u < 0.5 ? a.floor : b.floor, yaw: yaw + sway, pitch: pitch + (moving ? 0.35 * Math.sin(t * Math.PI * 2 * 1.7 + 1) : 0), bob };
 };
 
 /** Blink alpha: black over each cut, plus a fade in at the start and out at the end. */
@@ -198,9 +233,10 @@ await page.evaluateOnNewDocument(({ id, q }) => {
         // ignore
     }
 }, { id: siteId, q: quality });
-await page.goto(base, { waitUntil: 'domcontentloaded' });
+// a deep link names the site, which also skips the experience chooser
+await page.goto(`${base}?site=${siteId}`, { waitUntil: 'domcontentloaded' });
 await page.waitForFunction(() => !document.getElementById('enter')?.disabled, { timeout: 600000 });
-await page.click('#enter');
+await page.evaluate(() => document.getElementById('enter').click());
 await new Promise((r) => setTimeout(r, 6000));
 
 // headset-like view: no page chrome, wide field of view, a black fade layer we drive
@@ -216,18 +252,24 @@ await page.evaluate((fov) => {
     });
 }, FOV);
 
-const groundOf = async (x, z) => {
-    return page.evaluate(({ x, z }) => {
+/**
+ * Floor under a point. `floor` names a storey for a model with more than one; without it the
+ * ray starts above everything and a two-storey building answers with its roof.
+ */
+const groundOf = async (x, z, floor) => {
+    return page.evaluate(({ x, z, floor }) => {
         const qa = window.__sitexr;
-        const g = qa.rig.groundAt(x, z);
+        const g = qa.rig.groundAt(x, z, floor === undefined ? undefined : floor + 2.2,
+            floor === undefined ? undefined : 3.4);
         if (g !== null && Number.isFinite(g)) return g;
-        return qa.rig.findStand(x, z).y;
-    }, { x, z });
+        return qa.rig.findStand(x, z, floor).y;
+    }, { x, z, floor });
 };
 // ground under every keyframe, so the timeline can be evaluated without the page
 const grounds = new Map();
-for (const k of shot.keys) grounds.set(`${k.x},${k.z}`, await groundOf(k.x, k.z));
-const groundKey = (x, z) => grounds.get(`${x},${z}`) ?? 0;
+const gkey = (x, z, floor) => `${x},${z},${floor ?? ''}`;
+for (const k of shot.keys) grounds.set(gkey(k.x, k.z, k.floor), await groundOf(k.x, k.z, k.floor));
+const groundKey = (x, z, floor) => grounds.get(gkey(x, z, floor)) ?? 0;
 
 const total = Math.round(duration * fps);
 console.log(`${siteId}: ${total} frames at ${fps} fps (${duration}s), ${width}x${height}`);
@@ -244,12 +286,16 @@ for (let f = 0; f < total; f++) {
             if (e.do === 'card') qa.markers.openCard(qa.site.pois.find((p) => p.id === e.poi), true);
             if (e.do === 'closeCard') qa.markers.closeCard();
             if (e.do === 'menu') qa.menu.open();
+            if (e.do === 'menuPage') { qa.menu.page = e.page; qa.menu.render(); }
             if (e.do === 'closeMenu') qa.menu.close();
+            if (e.do === 'doors') {
+                for (const i of e.leaves) qa.doors.leaves[i].set(e.open ?? 1);
+            }
         }, e);
     }
     // interpolate between keyframe grounds so the eye height never steps
     const p = poseAt(t, groundKey);
-    const ground = await groundOf(p.x, p.z);
+    const ground = await groundOf(p.x, p.z, p.floor);
     await page.evaluate(({ x, z, yaw, pitch, y, fade }) => {
         const qa = window.__sitexr;
         const cm = qa.viewer.internals.cameraManager();
