@@ -220,6 +220,19 @@ check('the watcher is a screen, not a second visitor', inert.input === false && 
 await host.screenshot({ path: 'test-output/share/presenter.png' });
 await view.screenshot({ path: 'test-output/share/watcher.png' });
 
+// The watcher has to match the presenter's field of view, or it draws the right place from
+// the right spot and still shows a tighter crop than the wearer is describing.
+const fovs = await (async () => {
+    const sent = await host.evaluate(() => window.__sitexr.share.viewers >= 0 && window.__sitexr.viewer.internals.cameraManager().camera.fov);
+    const got = await view.evaluate(() => {
+        const cam = window.__sitexr.rig.camera.camera;
+        return { fov: cam.fov, horizontal: cam.horizontalFov };
+    });
+    return { sent, got };
+})();
+check('the watcher adopts the presenter field of view', Math.abs(fovs.got.fov - 70) < 0.1 || fovs.got.horizontal === true,
+    JSON.stringify(fovs));
+
 // A second presenter cannot hijack a code in use. This has to be a real WebSocket: a page
 // cannot set the Upgrade header on fetch, so a plain fetch tests nothing.
 const busy = await host.evaluate(

@@ -406,6 +406,14 @@ const main = async () => {
                 p: [+p.x.toFixed(3), +p.y.toFixed(3), +p.z.toFixed(3)],
                 f: [+f.x.toFixed(4), +f.y.toFixed(4), +f.z.toFixed(4)]
             };
+            // In a session the headset owns the projection, so read the real angle off it;
+            // outside one the camera's own setting is the truth.
+            const view = app.xr?.active ? app.xr.views?.list?.[0] : null;
+            const proj = (view?.projMat as unknown as { data?: Float32Array } | undefined)?.data;
+            state.fov =
+                proj && proj[0]
+                    ? +((2 * Math.atan(1 / Math.abs(proj[0])) * 180) / Math.PI).toFixed(1)
+                    : +(camera.camera?.fov ?? 70).toFixed(1);
             if (doors) state.d = doors.leaves.map((l) => +l.open.toFixed(2));
             state.c = markers.cardOpen ? (markers.openPoiId ?? null) : null;
             state.t = tour.active ? tour.index : null;
@@ -664,6 +672,10 @@ const main = async () => {
                 followTarget.p.set(shared.p[0], shared.p[1], shared.p[2]);
                 followTarget.f.set(shared.f[0], shared.f[1], shared.f[2]);
                 followTarget.have = true;
+                if (shared.fov && camera.camera) {
+                    camera.camera.horizontalFov = true;
+                    camera.camera.fov = shared.fov;
+                }
                 if (shared.d && doors) {
                     shared.d.forEach((v, i) => doors?.leaves[i]?.set(v));
                 }

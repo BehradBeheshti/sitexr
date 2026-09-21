@@ -460,13 +460,13 @@ const design1: Site = {
     kind: 'design',
     name: 'Design Review 1',
     subtitle: 'Revit model \u00b7 curtain walling, railings, solar array',
-    blurb: 'An architectural model with its curtain walling, railings and roof-mounted solar array. Walk the terraces and read the elevations from the ground.',
+    blurb: 'An architectural model on its own terrain. Start inside, then step out to read the glazed elevation, the terrace railings and the ground-mounted solar array.',
     tag: 'Revit model',
     poster: 'private/poster-design1.webp',
     model: { url: 'private/design1.glb' },
     collision: { type: 'mesh', url: 'private/design1.glb' },
     worldScale: 1,
-    spawn: { x: 22, z: 3, floor: 2, look: [8, 3.4, 3] },
+    spawn: { x: 0, z: 2, floor: 0, look: [8, 1.5, 6] },
     walkRadius: 70,
     background: [0.46, 0.50, 0.56],
     pois: [
@@ -475,11 +475,11 @@ const design1: Site = {
         { id: 'solar', index: 3, title: 'Solar array', text: 'The ground-mounted array, set out clear of the building. Its spacing is what decides whether the rows shade each other.', marker: [-16, 2.2, -2], stand: { x: -11, z: -7, floor: 2, look: [-17, 2.2, -1] } }
     ],
     tour: [
-        { title: 'Arrival', text: 'A design model, at full size.', x: 22, z: 3, floor: 2, look: [8, 3.4, 3], dwell: 8 },
+        { title: 'Arrival', text: 'A design model, at full size.', x: 0, z: 2, floor: 0, look: [8, 1.5, 6], dwell: 8 },
         { title: 'Glazed elevation', text: 'Curtain walling on the grid the model sets out.', x: 20, z: 9, floor: 0, look: [9, 3.0, 8], dwell: 9 },
         { title: 'Terrace', text: 'Railings at 1100 mm.', x: 2, z: 17, floor: -2, look: [6, 1.6, 6], dwell: 9 },
         { title: 'Solar array', text: 'The ground-mounted array, clear of the building.', x: -11, z: -7, floor: 2, look: [-17, 2.2, -1], dwell: 9 },
-        { title: 'End of tour', text: 'Back at the arrival point. Press B for the menu.', x: 22, z: 3, floor: 2, look: [8, 3.4, 3], dwell: 6 }
+        { title: 'End of tour', text: 'Back at the arrival point. Press B for the menu.', x: 0, z: 2, floor: 0, look: [8, 1.5, 6], dwell: 6 }
     ],
     credits: {
         sceneTitle: 'Design Review 1',

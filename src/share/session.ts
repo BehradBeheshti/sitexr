@@ -26,6 +26,14 @@ export type ShareState = {
     c?: string | null;
     /** guided tour stop, if running */
     t?: number | null;
+    /**
+     * The presenter's horizontal field of view, in degrees.
+     *
+     * Without this the watcher drew the right place from the right spot and still looked
+     * wrong: a headset sees about a hundred degrees across and the desktop camera seventy,
+     * so the projected view was a tight crop of what the wearer was describing.
+     */
+    fov?: number;
 };
 
 export type ShareStatus =
