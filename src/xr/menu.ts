@@ -219,40 +219,55 @@ export class VrMenu {
     private drawSites(ctx: CanvasRenderingContext2D, w: number, h: number) {
         drawPanelBackground(ctx, w, h, 'Switch site');
 
-        const bw = w - 96;
-        let y = 104;
-        for (const mode of MODES) {
-            const list = sitesOf(mode.id);
-            if (!list.length) continue;
-            ctx.fillStyle = THEME.muted;
-            ctx.font = `600 22px ${THEME.font}`;
-            ctx.textAlign = 'left';
-            ctx.fillText(mode.name.toUpperCase(), 48, y + 16);
-            y += 36;
+        const groups = MODES.map((mode) => ({ mode, list: sitesOf(mode.id) })).filter((g) => g.list.length);
+        const rows = groups.reduce((n, g) => n + g.list.length, 0);
 
-            for (const site of list) {
+        // The list has to fit the panel. It did with four sites and did not with seven, and
+        // what overflowed was not clipped: the rows ran under the Back button, so pressing
+        // Back chose a site instead. Lay out to the space there is.
+        const top = 100;
+        const bottom = h - 104;
+        const space = bottom - top;
+        const headers = groups.length * 34;
+        const twoUp = rows > 5;
+        const lines = twoUp ? groups.reduce((n, g) => n + Math.ceil(g.list.length / 2), 0) : rows;
+        const rowH = Math.max(56, Math.min(92, Math.floor((space - headers - groups.length * 10) / lines) - 10));
+        const colW = twoUp ? (w - 96 - 12) / 2 : w - 96;
+
+        let y = top;
+        for (const { mode, list } of groups) {
+            ctx.fillStyle = THEME.muted;
+            ctx.font = `600 21px ${THEME.font}`;
+            ctx.textAlign = 'left';
+            ctx.fillText(mode.name.toUpperCase(), 48, y + 15);
+            y += 32;
+
+            list.forEach((site, i) => {
+                const col = twoUp ? i % 2 : 0;
+                const x = 48 + col * (colW + 12);
                 const current = site.id === this.actions.site.id;
-                const b = this.button(`site:${site.id}`, 48, y, bw, 92);
-                drawButton(ctx, b, '', { hover: this.panel.hover === b.id, primary: current, size: 28 });
+                const b = this.button(`site:${site.id}`, x, y, colW, rowH);
+                drawButton(ctx, b, '', { hover: this.panel.hover === b.id, primary: current, size: 26 });
 
                 ctx.textAlign = 'left';
                 ctx.fillStyle = current ? '#1b1205' : THEME.text;
-                ctx.font = `600 32px ${THEME.font}`;
-                ctx.fillText(site.name, 74, y + 40);
+                ctx.font = `600 ${rowH > 74 ? 30 : 25}px ${THEME.font}`;
+                ctx.fillText(site.name, x + 22, y + rowH * 0.44);
                 ctx.fillStyle = current ? 'rgba(27,18,5,0.74)' : THEME.muted;
-                ctx.font = `400 23px ${THEME.font}`;
-                ctx.fillText(current ? 'you are here' : site.tag, 74, y + 70);
-                y += 102;
-            }
-            y += 12;
+                ctx.font = `400 ${rowH > 74 ? 22 : 19}px ${THEME.font}`;
+                ctx.fillText(current ? 'you are here' : site.tag, x + 22, y + rowH * 0.78);
+
+                if (!twoUp || col === 1 || i === list.length - 1) y += rowH + 10;
+            });
+            y += 10;
         }
 
         ctx.fillStyle = THEME.muted;
-        ctx.font = `400 21px ${THEME.font}`;
+        ctx.font = `400 19px ${THEME.font}`;
         ctx.textAlign = 'center';
-        ctx.fillText('Loading another site leaves VR for a moment.', w / 2, y + 26);
+        ctx.fillText('Loading another site leaves VR for a moment.', w / 2, h - 110);
 
-        const back = this.button('back', 48, h - 92, bw, 68);
+        const back = this.button('back', 48, h - 92, w - 96, 68);
         drawButton(ctx, back, 'Back', { hover: this.panel.hover === 'back', size: 28 });
     }
 

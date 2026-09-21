@@ -377,6 +377,120 @@ const officeBuilding: Site = {
     }
 };
 
+// Three coordination and review models supplied as Revit FBX exports. Units were measured
+// rather than assumed: an 18-inch column and a 16-inch joist read 0.457 and 0.406 in the two
+// clash models, so those are metres; a door leaf reads 6.65 in the review model, so that one
+// is in feet, which is what Revit writes.
+const clash1: Site = {
+    id: 'clash1',
+    kind: 'design',
+    name: 'Clash Detection 1',
+    subtitle: 'Coordination model \u00b7 four floors \u00b7 frame and services',
+    blurb: 'A structural frame with its ducts and joists, four floors of it. Walk between the services at full size and see where they actually run.',
+    tag: 'Coordination',
+    poster: 'private/poster-clash1.webp',
+    model: { url: 'private/clash1.glb' },
+    collision: { type: 'mesh', url: 'private/clash1.glb' },
+    worldScale: 1,
+    spawn: { x: 0, z: 0, floor: 0, look: [-11, 2.2, 0] },
+    walkRadius: 45,
+    // darker than the capture sites: these models are pale and read as nothing against a
+    // bright sky
+    background: [0.46, 0.50, 0.56],
+    pois: [
+        { id: 'frame', index: 1, title: 'Frame', text: 'Concrete columns at 18 inches square, on the grid the model sets out. That measurement is how the units were confirmed.', marker: [-6, 2.6, 0], stand: { x: 3, z: -14, floor: 0, look: [-6, 2.0, -2] } },
+        { id: 'services', index: 2, title: 'Ductwork', text: 'Oval duct running in the same zone as the joists. Standing under a crossing is the quickest way to see whether it clears.', marker: [-14, 6.0, 4], stand: { x: -8, z: 4, floor: 4.5, look: [-18, 6.0, 4] } },
+        { id: 'upper', index: 3, title: 'Joist zone', text: 'Timber open web joists at 16 inches deep, on the top floor where the frame is clearest.', marker: [-4, 10.5, 0], stand: { x: 0, z: 0, floor: 8, look: [-11, 10.0, 0] } }
+    ],
+    tour: [
+        { title: 'Arrival', text: 'A coordination model, at full size.', x: 0, z: 0, floor: 0, look: [-11, 2.2, 0], dwell: 8 },
+        { title: 'Frame', text: 'Columns on the grid, 18 inches square.', x: 3, z: -14, floor: 0, look: [-6, 2.0, -2], dwell: 9 },
+        { title: 'Ductwork', text: 'Oval duct sharing the zone with the joists.', x: -8, z: 4, floor: 4.5, look: [-18, 6.0, 4], dwell: 9 },
+        { title: 'Joist zone', text: 'Open web joists at 16 inches deep.', x: 0, z: 0, floor: 8, look: [-11, 10.0, 0], dwell: 9 },
+        { title: 'End of tour', text: 'Back at the arrival point. Press B for the menu.', x: 0, z: 0, floor: 0, look: [-11, 2.2, 0], dwell: 6 }
+    ],
+    credits: {
+        sceneTitle: 'Clash Detection 1',
+        sceneAuthor: 'supplied by the project',
+        sceneLicense: 'not for redistribution',
+        sceneLicenseUrl: '',
+        sceneSourceUrl: '',
+        changes: 'Revit FBX read with assimp, node transforms baked in, meshes merged to one per material, materials made double-sided and a ground plane added. Units measured from an 18-inch column, not assumed.'
+    }
+};
+
+const clash2: Site = {
+    id: 'clash2',
+    kind: 'design',
+    name: 'Clash Detection 2',
+    subtitle: 'Coordination model \u00b7 seven levels \u00b7 steel and services',
+    blurb: 'Seven levels of steel frame with the pipework and ducts threaded through it. The kind of model that only starts making sense once you are standing inside it.',
+    tag: 'Coordination',
+    poster: 'private/poster-clash2.webp',
+    model: { url: 'private/clash2.glb' },
+    collision: { type: 'mesh', url: 'private/clash2.glb' },
+    worldScale: 1,
+    spawn: { x: 29.8, z: -29.8, floor: 0, look: [14, 3.0, -20] },
+    walkRadius: 60,
+    background: [0.46, 0.50, 0.56],
+    pois: [
+        { id: 'frame', index: 1, title: 'Steel frame', text: 'Seven levels of steel, about 47 by 42 m on plan. Walking the grid is how you read a frame this dense.', marker: [14, 3.0, -20], stand: { x: 26.3, z: -12.8, floor: 0, look: [10, 3.0, -20] } },
+        { id: 'services', index: 2, title: 'Service runs', text: 'Pipework and ducts threaded through the frame, coloured as the source drawing had them and toned down so a wall of them is bearable at arm\u2019s length.', marker: [14, 4.4, -14], stand: { x: 26.8, z: -3.8, floor: 0, look: [13, 4.2, -14] } },
+        { id: 'upper', index: 3, title: 'Upper level', text: 'The same frame eleven metres up, where the floors thin out and the structure is easiest to follow.', marker: [11, 13.4, -25], stand: { x: 19.3, z: -20.3, floor: 11.5, look: [9, 13.0, -26] } }
+    ],
+    tour: [
+        { title: 'Arrival', text: 'A coordination model, at full size.', x: 29.8, z: -29.8, floor: 0, look: [14, 3.0, -20], dwell: 8 },
+        { title: 'Steel frame', text: 'Seven levels of steel on a 47 by 42 m plan.', x: 26.3, z: -12.8, floor: 0, look: [10, 3.0, -20], dwell: 9 },
+        { title: 'Service runs', text: 'Pipework and ducts threaded through the frame.', x: 26.8, z: -3.8, floor: 0, look: [13, 4.2, -14], dwell: 9 },
+        { title: 'Upper level', text: 'The same frame eleven metres up.', x: 19.3, z: -20.3, floor: 11.5, look: [9, 13.0, -26], dwell: 9 },
+        { title: 'End of tour', text: 'Back at the arrival point. Press B for the menu.', x: 29.8, z: -29.8, floor: 0, look: [14, 3.0, -20], dwell: 6 }
+    ],
+    credits: {
+        sceneTitle: 'Clash Detection 2',
+        sceneAuthor: 'supplied by the project',
+        sceneLicense: 'not for redistribution',
+        sceneLicenseUrl: '',
+        sceneSourceUrl: '',
+        changes: 'FBX flattened on load because assimp aborts on this file\u2019s 33,000 nodes, then baked, merged to one mesh per material, made double-sided and given a ground plane.'
+    }
+};
+
+const design1: Site = {
+    id: 'design1',
+    kind: 'design',
+    name: 'Design Review 1',
+    subtitle: 'Revit model \u00b7 curtain walling, railings, solar array',
+    blurb: 'An architectural model with its curtain walling, railings and roof-mounted solar array. Walk the terraces and read the elevations from the ground.',
+    tag: 'Revit model',
+    poster: 'private/poster-design1.webp',
+    model: { url: 'private/design1.glb' },
+    collision: { type: 'mesh', url: 'private/design1.glb' },
+    worldScale: 1,
+    spawn: { x: 22, z: 3, floor: 2, look: [8, 3.4, 3] },
+    walkRadius: 70,
+    background: [0.46, 0.50, 0.56],
+    pois: [
+        { id: 'facade', index: 1, title: 'Glazed elevation', text: 'Curtain walling on the grid the model sets out, read from where someone would actually stand rather than off a drawing.', marker: [12, 4.0, 6], stand: { x: 20, z: 9, floor: 0, look: [9, 3.0, 8] } },
+        { id: 'terrace', index: 2, title: 'Terrace and railings', text: 'Railings at 1100 mm. That is the dimension a drawing states and the body argues with, so stand at one.', marker: [2, 1.4, 14], stand: { x: 2, z: 17, floor: -2, look: [6, 1.6, 6] } },
+        { id: 'solar', index: 3, title: 'Solar array', text: 'The ground-mounted array, set out clear of the building. Its spacing is what decides whether the rows shade each other.', marker: [-16, 2.2, -2], stand: { x: -11, z: -7, floor: 2, look: [-17, 2.2, -1] } }
+    ],
+    tour: [
+        { title: 'Arrival', text: 'A design model, at full size.', x: 22, z: 3, floor: 2, look: [8, 3.4, 3], dwell: 8 },
+        { title: 'Glazed elevation', text: 'Curtain walling on the grid the model sets out.', x: 20, z: 9, floor: 0, look: [9, 3.0, 8], dwell: 9 },
+        { title: 'Terrace', text: 'Railings at 1100 mm.', x: 2, z: 17, floor: -2, look: [6, 1.6, 6], dwell: 9 },
+        { title: 'Solar array', text: 'The ground-mounted array, clear of the building.', x: -11, z: -7, floor: 2, look: [-17, 2.2, -1], dwell: 9 },
+        { title: 'End of tour', text: 'Back at the arrival point. Press B for the menu.', x: 22, z: 3, floor: 2, look: [8, 3.4, 3], dwell: 6 }
+    ],
+    credits: {
+        sceneTitle: 'Design Review 1',
+        sceneAuthor: 'supplied by the project',
+        sceneLicense: 'not for redistribution',
+        sceneLicenseUrl: '',
+        sceneSourceUrl: '',
+        changes: 'Revit FBX read with assimp and rescaled from feet, verified against a door leaf at 6.65 units. Transforms baked, meshes merged to one per material, materials double-sided, ground plane added.'
+    }
+};
+
 /**
  * Whether to offer sites whose model lives in `public/private/`, which is never committed.
  *
@@ -389,7 +503,7 @@ const PRIVATE_ASSETS =
     !!ASSET_BASE ||
     (import.meta.env.VITE_INCLUDE_PRIVATE as string | undefined) === '1';
 
-export const SITES: Site[] = [excavator, komatsu, scaffold, ...(PRIVATE_ASSETS ? [officeBuilding] : [])];
+export const SITES: Site[] = [excavator, komatsu, scaffold, ...(PRIVATE_ASSETS ? [officeBuilding, design1, clash1, clash2] : [])];
 export const DEFAULT_SITE = excavator.id;
 
 export const sitesOf = (mode: ModeId) => SITES.filter((s) => s.kind === mode);

@@ -221,7 +221,8 @@ const runViewport = async (label, viewport, { mockVr = false } = {}) => {
             check(`${label}: site "${id}" loads`, ok);
             if (!ok) continue;
             await page.screenshot({ path: join(outDir, `${label}-site-${id}-welcome.png`) });
-            await page.click('#enter');
+            // click through the DOM: with the card scrolled, the button may be out of view
+            await page.evaluate(() => document.getElementById('enter').click());
             await new Promise((r) => setTimeout(r, 4000));
             const st = await page.evaluate(() => ({ hud: !document.getElementById('hud').hidden, name: document.getElementById('hud-site-name').textContent }));
             check(`${label}: site "${id}" walkthrough entered`, st.hud, st.name);

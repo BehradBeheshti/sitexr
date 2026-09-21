@@ -87,6 +87,32 @@ await page.evaluate(({ top }) => {
 await new Promise((r) => setTimeout(r, 2500));
 await page.screenshot({ path: join(out, '01-top.png') });
 
+// free-camera views, for judging massing before choosing anywhere to stand:
+//   --fly "name:x,y,z,lx,ly,lz;..."
+const flyArg = process.argv.indexOf('--fly');
+if (flyArg !== -1) {
+    for (const spec of process.argv[flyArg + 1].split(';')) {
+        const [name, nums] = spec.split(':');
+        const [x, y, z, lx, ly, lz] = nums.split(',').map(Number);
+        await page.evaluate(({ x, y, z, lx, ly, lz }) => {
+            const qa = window.__sitexr;
+            const cm = qa.viewer.internals.cameraManager();
+            const V = qa.rig.camera.getPosition().constructor;
+            qa.viewer.state.cameraMode = 'fly';
+            cm.camera.look(new V(x, y, z), new V(lx, ly, lz));
+            cm.snap();
+            qa.viewer.app.renderNextFrame = true;
+        }, { x, y, z, lx, ly, lz });
+        await new Promise((r) => setTimeout(r, 2200));
+        await page.screenshot({ path: join(out, `fly-${name}.png`) });
+        console.log('fly', name, 'from', [x, y, z].join(','));
+    }
+    await browser.close();
+    server.close();
+    console.log('fly done ->', out);
+    process.exit(0);
+}
+
 // ad-hoc probe views: --views "name:x,z,lx,ly,lz;..."
 const viewsArg = process.argv.indexOf('--views');
 if (viewsArg !== -1) {
