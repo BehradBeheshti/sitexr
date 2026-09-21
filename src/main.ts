@@ -93,7 +93,10 @@ const main = async () => {
         onTourStop: () => sessionTour()?.stop(),
         onReset: () => sessionApi()?.resetDesktop(),
         onPoiGo: (poi) => sessionApi()?.desktopGoTo(poi.stand.x, poi.stand.z, poi.stand.look),
-        onChangeSite: () => screens.showWelcome()
+        onChangeSite: () => {
+            screens.showAllSites();
+            screens.showWelcome();
+        }
     });
 
     // per-session API reachable from the screens callbacks
@@ -144,6 +147,44 @@ const main = async () => {
         } finally {
             starting = null;
         }
+    };
+
+    /**
+     * Set when a switch was started from inside the headset. Loading a site tears the viewer
+     * down and the XR session with it, so the visitor has to come back in; this is what makes
+     * that one step rather than four.
+     */
+    let resumeVr = false;
+
+    /**
+     * Ask the browser to put the visitor back in VR after an in-headset switch.
+     *
+     * `offerSession` exists for exactly this: the headset resumes when the wearer is ready,
+     * with no DOM click, which they cannot give while wearing it. Where it is missing the
+     * welcome screen is already showing its Enter button, so the fallback is one press.
+     */
+    const offerVrAgain = async () => {
+        if (!resumeVr || !vrSupported) return;
+        resumeVr = false;
+        const xr = navigator.xr as unknown as
+            { offerSession?: (mode: string, init?: unknown) => Promise<unknown> } | undefined;
+        if (!xr?.offerSession) return;
+        try {
+            await xr.offerSession('immersive-vr', { optionalFeatures: ['local-floor'] });
+        } catch {
+            // the browser declined to offer; the Enter button is right there
+        }
+    };
+
+    /** Switch from inside the headset: remember to come back, then load the new site. */
+    const onSwitchSite = async (id: string) => {
+        resumeVr = true;
+        await selectSite(id);
+    };
+
+    /** Called once a newly loaded site is drawable. */
+    const onSiteReady = async () => {
+        await offerVrAgain();
     };
 
     const enter = async () => {
@@ -296,8 +337,17 @@ const main = async () => {
             tourActive: () => tour.active,
             toggleTour: () => tour.toggle(),
             replayTutorial: () => tutorial.start(),
-            switchSite: () => {
-                rig.exitVr();
+            switchSite: (id: string) => {
+                void (async () => {
+                    // Fade out first, but never wait on it: the fade resolves from the render
+                    // loop, and the visitor must not be stranded in a menu if that stops.
+                    await Promise.race([
+                        rig.fade(1, 4),
+                        new Promise((done) => setTimeout(done, 400))
+                    ]);
+                    rig.exitVr();
+                    await onSwitchSite(id);
+                })();
             },
             site
         });
@@ -471,6 +521,7 @@ const main = async () => {
             markers.setVisible(true);
             screens.setReady(vrSupported);
             app.renderNextFrame = true;
+            void onSiteReady();
         };
         if (state.loaded) onLoaded();
         else events.once('loaded:changed', onLoaded);

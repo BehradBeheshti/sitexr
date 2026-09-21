@@ -303,6 +303,27 @@ and the bucket must allow cross-origin reads. `public/private/` and the model fo
 gitignored, and `bash tools/install-hooks.sh` adds a pre-commit hook that refuses to commit
 them by accident.
 
+## Moving between sites
+
+Three ways in, and they are meant to feel like one thing.
+
+| Where | How |
+| --- | --- |
+| A link | `?site=<id>` opens that site; `?mode=capture` or `?mode=design` opens that side's first |
+| Desktop | **Change site** in the heads-up display lists every site at once, both experiences |
+| In the headset | **B → Switch site** lists every site on a panel; point and pull the trigger |
+
+The two experience cards on the way in are a deliberate split, because a scan and a design
+model are for different people. Once someone is already inside, that framing only puts the
+scene they want an extra click away, so both switchers ignore it and show the lot.
+
+Loading a site tears the viewer down, and the XR session goes with it, so a switch made in
+the headset has to come back out for a moment. It fades, leaves VR, loads, and then calls
+`navigator.xr.offerSession`, which exists for this: the headset resumes when the wearer is
+ready, with no DOM click, which they cannot give while wearing it. Where that call is not
+available the welcome screen is already up with its Enter button, so the fallback is one
+press rather than four.
+
 ## Capturing images for figures
 
 `tools/capture-figures.mjs` renders a large still set from the built site: for every site the

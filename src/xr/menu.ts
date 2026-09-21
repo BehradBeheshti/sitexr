@@ -1,6 +1,6 @@
 // The in-VR menu: Resume, Reset Position, Guided Tour, Comfort Settings, About, Exit VR.
 // Opens 1.3 m ahead of the visitor and pauses locomotion while it is up.
-import { BRAND, TECH_CREDIT } from '../config';
+import { BRAND, MODES, TECH_CREDIT, sitesOf } from '../config';
 import type { Site } from '../config';
 import { settings } from '../settings';
 import type { Comfort } from '../settings';
@@ -8,14 +8,14 @@ import { Panel, THEME, drawButton, drawPanelBackground, wrapText } from './panel
 import type { Button } from './panel';
 import type { XrRig } from './rig';
 
-type Page = 'main' | 'comfort' | 'about';
+type Page = 'main' | 'comfort' | 'about' | 'sites';
 
 export type MenuActions = {
     tourActive: () => boolean;
     toggleTour: () => void;
     replayTutorial: () => void;
-    /** Leave VR and return to the site picker. */
-    switchSite: () => void;
+    /** Go to another site. Loading one ends the session, so this leaves VR on the way. */
+    switchSite: (id: string) => void;
     site: Site;
 };
 
@@ -96,8 +96,7 @@ export class VrMenu {
                 this.rig.exitVr();
                 break;
             case 'switch':
-                this.close();
-                this.actions.switchSite();
+                this.page = 'sites';
                 break;
             case 'back':
                 this.page = 'main';
@@ -107,6 +106,12 @@ export class VrMenu {
                 this.actions.replayTutorial();
                 break;
             default: {
+                if (id.startsWith('site:')) {
+                    const target = id.slice(5);
+                    this.close();
+                    if (target !== this.actions.site.id) this.actions.switchSite(target);
+                    return;
+                }
                 // comfort options are encoded as key:value
                 const [key, value] = id.split(':');
                 if (key && value !== undefined) {
@@ -127,6 +132,7 @@ export class VrMenu {
             panel.buttons = [];
             if (this.page === 'main') this.drawMain(ctx, w, h);
             else if (this.page === 'comfort') this.drawComfort(ctx, w, h);
+            else if (this.page === 'sites') this.drawSites(ctx, w, h);
             else this.drawAbout(ctx, w, h);
         });
     }
@@ -135,6 +141,51 @@ export class VrMenu {
         const b = { id, x, y, w, h };
         this.panel.buttons.push(b);
         return b;
+    }
+
+    /**
+     * Every site, both experiences, in one list. The 2D chooser separates captures from
+     * design models because they are for different people; in here the visitor is already
+     * one of those people and just wants the other scene.
+     */
+    private drawSites(ctx: CanvasRenderingContext2D, w: number, h: number) {
+        drawPanelBackground(ctx, w, h, 'Switch site');
+
+        const bw = w - 96;
+        let y = 104;
+        for (const mode of MODES) {
+            const list = sitesOf(mode.id);
+            if (!list.length) continue;
+            ctx.fillStyle = THEME.muted;
+            ctx.font = `600 22px ${THEME.font}`;
+            ctx.textAlign = 'left';
+            ctx.fillText(mode.name.toUpperCase(), 48, y + 16);
+            y += 36;
+
+            for (const site of list) {
+                const current = site.id === this.actions.site.id;
+                const b = this.button(`site:${site.id}`, 48, y, bw, 92);
+                drawButton(ctx, b, '', { hover: this.panel.hover === b.id, primary: current, size: 28 });
+
+                ctx.textAlign = 'left';
+                ctx.fillStyle = current ? '#1b1205' : THEME.text;
+                ctx.font = `600 32px ${THEME.font}`;
+                ctx.fillText(site.name, 74, y + 40);
+                ctx.fillStyle = current ? 'rgba(27,18,5,0.74)' : THEME.muted;
+                ctx.font = `400 23px ${THEME.font}`;
+                ctx.fillText(current ? 'you are here' : site.tag, 74, y + 70);
+                y += 102;
+            }
+            y += 12;
+        }
+
+        ctx.fillStyle = THEME.muted;
+        ctx.font = `400 21px ${THEME.font}`;
+        ctx.textAlign = 'center';
+        ctx.fillText('Loading another site leaves VR for a moment.', w / 2, y + 26);
+
+        const back = this.button('back', 48, h - 92, bw, 68);
+        drawButton(ctx, back, 'Back', { hover: this.panel.hover === 'back', size: 28 });
     }
 
     private drawMain(ctx: CanvasRenderingContext2D, w: number, h: number) {

@@ -1,6 +1,6 @@
 // The DOM side of SiteXR: loading / welcome overlay, the desktop walkthrough HUD, the
 // settings and credits modals. Nothing here is visible inside an immersive session.
-import { MODES, availableModes, sitesOf } from '../config';
+import { MODES, availableModes, modeOf, sitesOf } from '../config';
 import type { ModeId, Poi, Site, TourStop } from '../config';
 import { settings } from '../settings';
 import type { Comfort } from '../settings';
@@ -94,14 +94,31 @@ export class Screens {
 
     /** Back to the two cards, without unloading whatever is already running. */
     showModeChooser() {
+        this.showingAll = false;
         this.mode = null;
         this.applyMode();
     }
 
+    /**
+     * Every site at once, whichever experience it belongs to.
+     *
+     * The two cards exist because captures and design models are for different people, and
+     * that framing is right on the way in. Once someone is already inside, it only puts the
+     * scene they want two clicks away, so "Change site" lists the lot.
+     */
+    showAllSites() {
+        this.showingAll = true;
+        if (this.mode === null) this.mode = modeOf(this.site.id);
+        this.applyMode();
+    }
+
     setMode(mode: ModeId) {
+        this.showingAll = false;
         this.mode = mode;
         this.applyMode();
     }
+
+    private showingAll = false;
 
     private applyMode() {
         const chosen = this.mode !== null;
@@ -115,7 +132,9 @@ export class Screens {
         $('enter').hidden = !chosen;
         $('mode-note').hidden = !chosen;
         if (chosen) {
-            $('mode-name').textContent = MODES.find((x) => x.id === this.mode)?.name ?? '';
+            $('mode-name').textContent = this.showingAll
+                ? 'All sites'
+                : (MODES.find((x) => x.id === this.mode)?.name ?? '');
             this.renderSites();
         }
     }
@@ -125,7 +144,7 @@ export class Screens {
     private renderSites() {
         const host = $('sites');
         host.innerHTML = '';
-        const list = this.mode ? sitesOf(this.mode) : this.cb.sites;
+        const list = this.showingAll || !this.mode ? this.cb.sites : sitesOf(this.mode);
         for (const site of list) {
             const b = document.createElement('button');
             b.className = 'site';

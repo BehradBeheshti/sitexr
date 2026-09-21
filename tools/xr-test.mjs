@@ -367,6 +367,47 @@ await settle(500);
 await press('right', 'trigger');
 await settle(600);
 check('menu navigates to comfort settings', await page.evaluate(() => window.__sitexr.menu.page === 'comfort'));
+
+// back out, then into the site list
+const btnAt = (id) => page.evaluate((wanted) => {
+    const m = window.__sitexr.menu;
+    const b = m.panel.buttons.find((x) => x.id === wanted);
+    if (!b) return null;
+    const u = (b.x + b.w / 2) / m.panel.pxW;
+    const v = (b.y + b.h / 2) / m.panel.pxH;
+    const P = m.panel.entity.getPosition().constructor;
+    const out = new P();
+    m.panel.entity.getWorldTransform().transformPoint(new P((u - 0.5) * m.panel.width, (0.5 - v) * m.panel.height, 0), out);
+    return { x: out.x, y: out.y, z: out.z };
+}, id);
+
+const backBtn = await btnAt('back');
+await aimAt('right', backBtn);
+await settle(400);
+await press('right', 'trigger');
+await settle(500);
+
+const switchBtn = await btnAt('switch');
+await aimAt('right', switchBtn);
+await settle(400);
+await press('right', 'trigger');
+await settle(700);
+check('menu opens the in-VR site list', await page.evaluate(() => window.__sitexr.menu.page === 'sites'));
+
+const offered = await page.evaluate(() => {
+    const ids = window.__sitexr.menu.panel.buttons.map((b) => b.id).filter((id) => id.startsWith('site:'));
+    return { ids, here: window.__sitexr.site.id };
+});
+check('the site list offers every site, both experiences', offered.ids.length >= 4 &&
+    offered.ids.includes(`site:${offered.here}`), offered.ids.join(' '));
+await page.screenshot({ path: join(outDir, '13-site-list.png') });
+
+// back to the main page, so the rest of the run is unaffected
+await aimAt('right', await btnAt('back'));
+await settle(400);
+await press('right', 'trigger');
+await settle(500);
+check('the site list returns to the menu', await page.evaluate(() => window.__sitexr.menu.page === 'main'));
 await page.screenshot({ path: join(outDir, '07-comfort.png') });
 await page.evaluate(() => window.__sitexr.menu.close());
 await settle(400);
@@ -526,6 +567,38 @@ const ended = await page.evaluate(() => ({
 }));
 check('exiting VR returns to the welcome screen', ended.active === false && ended.welcome);
 await page.screenshot({ path: join(outDir, '10-after-exit.png') });
+
+// ---- switching site from the in-VR list --------------------------------------------------
+const wasOn = await page.evaluate(() => window.__sitexr.site.id);
+const other = await page.evaluate(() => {
+    // the menu rebuilds its buttons per page, so ask the site page for them
+    const m = window.__sitexr.menu;
+    m.page = 'sites';
+    m.render();
+    const ids = m.panel.buttons.map((b) => b.id).filter((id) => id.startsWith('site:'));
+    return ids.find((id) => id !== `site:${window.__sitexr.site.id}`) ?? null;
+});
+if (other) {
+    await page.evaluate((id) => window.__sitexr.menu.panel.onButton(id), other);
+    const want = other.slice(5);
+    let landed = null;
+    for (let i = 0; i < 120; i++) {
+        landed = await page.evaluate(() => window.__sitexr?.site?.id ?? null);
+        if (landed === want) break;
+        await settle(1000);
+    }
+    check(`choosing another site in VR loads it (${wasOn} -> ${want})`, landed === want, `ended on ${landed}`);
+    // the site id lands when the new session is built; the Enter button unlocks a beat
+    // later, when the first frame is drawable
+    let ready = false;
+    for (let i = 0; i < 90; i++) {
+        ready = await page.evaluate(() => !document.getElementById('enter')?.disabled);
+        if (ready) break;
+        await settle(1000);
+    }
+    check('the new site comes up ready to enter', ready === true);
+    await page.screenshot({ path: join(outDir, '14-after-switch.png') });
+}
 
 const benign = (e) => /favicon|WebGPU|GPU stall|Automatic fallback|swiftshader|GroupMarkerNotSet|ERR_BLOCKED_BY_CLIENT|Failed to load resource: net::ERR_FAILED/i.test(e);
 const real = errors.filter((e) => !benign(e));
