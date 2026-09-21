@@ -159,6 +159,12 @@ await sleep(2500);
 
 const diag = await view.evaluate(() => window.__sitexrWatch ?? null);
 check('the watcher receives the presenter viewpoint', (diag?.received ?? 0) > 0, JSON.stringify(diag));
+
+// A watcher that started on the wrong site has to load the right one, and over a network a
+// heavy model takes a while. Packets arrive throughout, so waiting on them proves nothing.
+await view
+    .waitForFunction((want) => window.__sitexr?.site?.id === want, { timeout: 600000 }, siteId)
+    .catch(() => null);
 const viewerSite = await view.evaluate(() => window.__sitexr?.site?.id ?? null);
 check('the watcher loads the site the presenter is in', viewerSite === siteId, String(viewerSite));
 
