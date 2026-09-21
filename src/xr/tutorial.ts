@@ -66,7 +66,7 @@ export class Tutorial {
             },
             {
                 title: 'Turn',
-                text: 'Flick the RIGHT thumbstick left or right to snap-turn. Smooth turning can be enabled in Comfort settings.',
+                text: 'Flick the RIGHT thumbstick left or right to snap-turn, or up and down to rise and drop a floor. Hold the grip while you do it to move further.',
                 check: (t) => t.turned
             },
             {

@@ -347,6 +347,18 @@ ready, with no DOM click, which they cannot give while wearing it. Where that ca
 available the welcome screen is already up with its Enter button, so the fallback is one
 press rather than four.
 
+## Getting above the floor
+
+A seven-storey coordination model cannot be reviewed by walking it. The right thumbstick
+lifts and drops the visitor: up or down for 0.6 m, or hold the grip for 2.5 m.
+
+The engine's own vertical snap translates the rig outright, and terrain following then puts
+it straight back on the floor next frame, which is why it was switched off. It is routed
+through a held offset instead, so the floor spring targets `ground + heightOffset` and the
+height stays where it was put. Above the floor the walk stops rejecting steps and missing
+ground, because a visitor who is hovering should be able to cross a void rather than be
+snapped back from it. Resetting position drops them back down.
+
 ## Showing a headset session on a screen
 
 One person walks the model in the headset; everyone else watches it live on a laptop or a
