@@ -1,7 +1,9 @@
 // First-time controller tutorial, shown in VR. Each step completes when the visitor
 // actually performs the input, so it doubles as a controller check.
 import { settings } from '../settings';
-import { Panel, THEME, drawButton, drawPanelBackground, roundRect, wrapText } from './panel';
+import { drawController } from '../ui/controller-art';
+import type { Hand, PartId } from '../ui/controller-art';
+import { Panel, THEME, drawButton, drawPanelBackground, wrapText } from './panel';
 import type { XrRig } from './rig';
 
 type Step = {
@@ -203,46 +205,33 @@ export class Tutorial {
         });
     }
 
-    /** A schematic Touch controller: stick, A/B, trigger; the active part glows amber. */
+    /**
+     * The controller this step is about, with the control it is asking for lit up. The art is
+     * the same one the Controls panel uses, so the tutorial can never point at a button that
+     * has moved.
+     */
     private drawGlyph(ctx: CanvasRenderingContext2D, x: number, y: number, step: number) {
-        ctx.save();
-        ctx.translate(x, y);
-        // body
-        roundRect(ctx, 0, 0, 130, 190, 40);
-        ctx.fillStyle = 'rgba(255,255,255,0.08)';
-        ctx.fill();
-        ctx.strokeStyle = THEME.line;
-        ctx.lineWidth = 3;
-        ctx.stroke();
-        // thumbstick
-        ctx.beginPath();
-        ctx.arc(45, 60, 24, 0, Math.PI * 2);
-        ctx.fillStyle = step === 1 || step === 2 ? THEME.accent : 'rgba(255,255,255,0.25)';
-        ctx.fill();
-        // face buttons
-        ctx.beginPath();
-        ctx.arc(95, 45, 12, 0, Math.PI * 2);
-        ctx.fillStyle = step === 4 ? THEME.accent : 'rgba(255,255,255,0.25)';
-        ctx.fill();
-        ctx.beginPath();
-        ctx.arc(95, 85, 12, 0, Math.PI * 2);
-        ctx.fillStyle = step === 4 ? THEME.accent : 'rgba(255,255,255,0.25)';
-        ctx.fill();
-        // trigger
-        roundRect(ctx, 20, 150, 60, 26, 10);
-        ctx.fillStyle = step === 3 ? THEME.accent : 'rgba(255,255,255,0.25)';
-        ctx.fill();
-        // head arrows for step 0
-        if (step === 0) {
-            ctx.fillStyle = THEME.accent;
-            ctx.font = `700 40px ${THEME.font}`;
-            ctx.textAlign = 'center';
-            ctx.fillText('↺', 65, -16);
-        }
-        ctx.fillStyle = THEME.muted;
+        // step 0 is "look around", which is not a button at all
+        const target: Array<{ hand: Hand; part: PartId } | null> = [
+            null,
+            { hand: 'left', part: 'stick' },
+            { hand: 'right', part: 'stick' },
+            { hand: 'right', part: 'trigger' },
+            { hand: 'right', part: 'upper' }
+        ];
+        const t = target[step];
+        drawController(ctx, t?.hand ?? 'right', x, y, 210, {
+            body: '#242936',
+            dish: '#39404f',
+            part: '#79839a',
+            highlight: THEME.accent,
+            letter: THEME.bgSoft
+        }, t?.part);
+
+        ctx.fillStyle = t ? THEME.accent : THEME.muted;
         ctx.font = `500 20px ${THEME.font}`;
         ctx.textAlign = 'center';
-        ctx.fillText(step === 1 ? 'LEFT' : step === 2 ? 'RIGHT' : '', 65, 215);
-        ctx.restore();
+        ctx.textBaseline = 'alphabetic';
+        ctx.fillText(t ? `${t.hand === 'left' ? 'LEFT' : 'RIGHT'} hand` : 'Turn your head', x + 70, y + 236);
     }
 }

@@ -1,6 +1,7 @@
 // The DOM side of SiteXR: loading / welcome overlay, the desktop walkthrough HUD, the
-// settings and credits modals. Nothing here is visible inside an immersive session.
+// settings and controls modals. Nothing here is visible inside an immersive session.
 import { MODES, availableModes, modeOf, sitesOf } from '../config';
+import { controllerSvg } from './controller-art';
 import type { ModeId, Poi, Site, TourStop } from '../config';
 import { settings } from '../settings';
 import type { Comfort } from '../settings';
@@ -46,6 +47,9 @@ export class Screens {
         $('enter').addEventListener('click', () => cb.onEnter());
         $('open-settings').addEventListener('click', () => this.openModal('modal-settings'));
         $('open-credits').addEventListener('click', () => this.openModal('modal-credits'));
+        // the controller diagram is generated rather than written out in the HTML, so the
+        // bindings it labels come from the same place the headset reads them from
+        $('controller-art').innerHTML = controllerSvg('left') + controllerSvg('right');
         $('open-watch').addEventListener('click', () => {
             const code = (window.prompt('Enter the code shown in the headset') ?? '').trim().toUpperCase();
             if (!code) return;

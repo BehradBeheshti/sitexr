@@ -1,6 +1,11 @@
 // The in-VR menu: Resume, Reset Position, Guided Tour, Comfort Settings, About, Exit VR.
 // Opens 1.3 m ahead of the visitor and pauses locomotion while it is up.
 import { BRAND, MODES, sitesOf } from '../config';
+import { BOX, drawLabelledController, layoutOf } from '../ui/controller-art';
+import type { Hand } from '../ui/controller-art';
+
+/** Width of one labelled controller drawing, in its own units. */
+const ART_W = layoutOf('right').w;
 import type { Site } from '../config';
 import { settings } from '../settings';
 import type { Comfort } from '../settings';
@@ -33,6 +38,10 @@ export class VrMenu {
     readonly panel: Panel;
 
     page: Page = 'main';
+
+    /** Which controller the Controls page is showing. Both are the same size on a panel
+     *  this wide, so they are shown one at a time rather than shrunk to fit side by side. */
+    private hand: Hand = 'right';
 
     private rig: XrRig;
 
@@ -100,6 +109,12 @@ export class VrMenu {
                 break;
             case 'about':
                 this.page = 'about';
+                break;
+            case 'hand:left':
+                this.hand = 'left';
+                break;
+            case 'hand:right':
+                this.hand = 'right';
                 break;
             case 'exit':
                 this.close();
@@ -345,33 +360,45 @@ export class VrMenu {
 
     private drawAbout(ctx: CanvasRenderingContext2D, w: number, h: number) {
         drawPanelBackground(ctx, w, h, 'Controls');
-        ctx.textAlign = 'left';
+
+        // The scene credit. For the recorded sites, naming the author and the licence is a
+        // condition of using them, so it has to appear in the headset too, not only on the page.
+        const c = this.actions.site.credits;
+        ctx.textAlign = 'center';
         ctx.textBaseline = 'alphabetic';
         ctx.fillStyle = THEME.muted;
-        ctx.font = `400 26px ${THEME.font}`;
-        let y = 150;
-        for (const line of [
-            'Left stick — walk, in the direction you are looking.',
-            'Right stick — flick left or right to turn, up or down to change floor.',
-            'Trigger — teleport, open a door, or read a note.',
-            'B — this menu.   Y — reset where you are standing.   X — guided tour.'
-        ]) {
-            y = wrapText(ctx, line, 48, y, w - 96, 36) + 8;
-        }
+        ctx.font = `400 22px ${THEME.font}`;
+        ctx.fillText(
+            c.sceneLicenseUrl
+                ? `“${c.sceneTitle}” by ${c.sceneAuthor}, ${c.sceneLicense}`
+                : `${c.sceneTitle}, ${c.sceneAuthor}`,
+            w / 2,
+            100
+        );
 
-        y += 16;
-        ctx.fillStyle = THEME.text;
-        ctx.font = `600 28px ${THEME.font}`;
-        ctx.fillText('This site', 48, y);
-        y += 40;
-        ctx.fillStyle = THEME.muted;
-        ctx.font = `400 26px ${THEME.font}`;
-        const c = this.actions.site.credits;
-        // The recorded scenes are CC BY: naming the author and the licence is a condition of use.
-        y = wrapText(ctx, c.sceneLicenseUrl
-            ? `“${c.sceneTitle}” by ${c.sceneAuthor}, ${c.sceneLicense}.`
-            : `${c.sceneTitle}, ${c.sceneAuthor}.`, 48, y, w - 96, 36);
-        y = wrapText(ctx, c.changes, 48, y + 4, w - 96, 34);
+        // One controller at a time, filling the panel: side by side the callout text comes out
+        // around 17 px on this canvas, which is not readable at arm's length.
+        const tabW = 210;
+        const lt = this.button('hand:left', w / 2 - tabW - 6, 120, tabW, 58);
+        const rt = this.button('hand:right', w / 2 + 6, 120, tabW, 58);
+        drawButton(ctx, lt, 'Left hand', { hover: this.panel.hover === 'hand:left', primary: this.hand === 'left', size: 26 });
+        drawButton(ctx, rt, 'Right hand', { hover: this.panel.hover === 'hand:right', primary: this.hand === 'right', size: 26 });
+
+        // Fill the space between the tabs and the Back button, keeping the drawing centred.
+        const top = 196;
+        const avail = h - 150 - top;
+        const artW = Math.min(w - 92, (avail / (BOX.h + 46)) * ART_W);
+        drawLabelledController(ctx, this.hand, (w - artW) / 2, top, artW, {
+            body: '#242936',
+            dish: '#39404f',
+            part: '#79839a',
+            highlight: THEME.accent,
+            letter: THEME.bgSoft,
+            leader: THEME.line,
+            title: THEME.text,
+            note: THEME.muted,
+            hand: THEME.accent
+        }, false);
 
         const bb = this.button('back', 48, h - 128, w - 96, 84);
         drawButton(ctx, bb, 'Back', { hover: this.panel.hover === 'back', primary: true, size: 30 });
