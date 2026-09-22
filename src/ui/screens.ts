@@ -168,6 +168,9 @@ export class Screens {
      */
     private watching = false;
 
+    /** True once a frame has actually arrived, so a later silence reads as paused. */
+    private hasWatched = false;
+
     setWatching(code: string) {
         this.watching = true;
         this.hideWelcome();
@@ -197,11 +200,21 @@ export class Screens {
             text.textContent = `Paused \u00b7 ${status.code ?? ''}`;
             return;
         }
+        // Two routes reach the same place: the relay reports the presenter's socket closed,
+        // or nothing has arrived for a few seconds and the screen works it out for itself.
+        // Whichever wins the race, a viewer should read the same word.
+        if (status.kind === 'waiting' && this.hasWatched) {
+            badge.hidden = false;
+            badge.classList.add('watch-paused');
+            text.textContent = `Paused \u00b7 ${status.code ?? ''}`;
+            return;
+        }
         badge.classList.remove('watch-paused');
         if (status.kind === 'waiting') {
             badge.hidden = false;
             text.textContent = `Waiting for ${status.code ?? ''} to start`;
         } else if (status.kind === 'watching') {
+            this.hasWatched = true;
             badge.hidden = false;
             text.textContent = `Watching \u00b7 ${status.code ?? ''}`;
         } else if (status.kind === 'error') {
