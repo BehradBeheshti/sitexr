@@ -129,6 +129,11 @@ export class Screens {
 
     private applyMode() {
         const chosen = this.mode !== null;
+        if (this.watching) {
+            this.renderSites();
+            this.applyWatchChrome();
+            return;
+        }
         $('modes').hidden = chosen;
         $('sites').hidden = !chosen;
         $('mode-bar').hidden = !chosen;
@@ -157,7 +162,14 @@ export class Screens {
         $('open-watch').hidden = !offered;
     }
 
+    /**
+     * A watching screen is not a visitor. It never gets a button to press, and while the
+     * presenter is changing scene it says so rather than offering a way in.
+     */
+    private watching = false;
+
     setWatching(code: string) {
+        this.watching = true;
         this.hideWelcome();
         $('watch-badge').hidden = false;
         $('watch-text').textContent = `Watching \u00b7 ${code}`;
@@ -167,9 +179,25 @@ export class Screens {
         $('hud-tour').hidden = true;
     }
 
+    /** While watching, the loading card keeps its progress bar and loses its controls. */
+    private applyWatchChrome() {
+        if (!this.watching) return;
+        for (const id of ['enter', 'sites', 'mode-bar', 'modes', 'site-lede', 'mode-note']) {
+            const el = document.getElementById(id);
+            if (el) el.hidden = true;
+        }
+    }
+
     setWatchStatus(status: { kind: string; code?: string; message?: string }) {
         const text = $('watch-text');
         const badge = $('watch-badge');
+        if (status.kind === 'paused') {
+            badge.hidden = false;
+            badge.classList.add('watch-paused');
+            text.textContent = `Paused \u00b7 ${status.code ?? ''}`;
+            return;
+        }
+        badge.classList.remove('watch-paused');
         if (status.kind === 'waiting') {
             badge.hidden = false;
             text.textContent = `Waiting for ${status.code ?? ''} to start`;
@@ -256,6 +284,10 @@ export class Screens {
     }
 
     setReady(xr: boolean) {
+        if (this.watching) {
+            this.applyWatchChrome();
+            return;
+        }
         const overlay = $('overlay');
         overlay.dataset.state = 'ready';
         this.setProgress(100, 'Site ready');
