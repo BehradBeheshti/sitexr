@@ -1,6 +1,6 @@
 // The in-VR menu: Resume, Reset Position, Guided Tour, Comfort Settings, About, Exit VR.
 // Opens 1.3 m ahead of the visitor and pauses locomotion while it is up.
-import { BRAND, MODES, TECH_CREDIT, sitesOf } from '../config';
+import { BRAND, MODES, sitesOf } from '../config';
 import type { Site } from '../config';
 import { settings } from '../settings';
 import type { Comfort } from '../settings';
@@ -284,7 +284,7 @@ export class VrMenu {
             ['tour', this.actions.tourActive() ? 'Stop guided tour' : 'Start guided tour'],
             ['comfort', 'Comfort settings'],
             ['share', this.actions.share.active() ? 'Sharing view\u2026' : 'Share view'],
-            ['about', 'About & credits'],
+            ['about', 'Controls'],
             ['switch', 'Switch site'],
             ['exit', 'Exit VR', true]
         ];
@@ -335,7 +335,7 @@ export class VrMenu {
         ctx.fillStyle = THEME.muted;
         ctx.font = `400 22px ${THEME.font}`;
         ctx.textAlign = 'left';
-        ctx.fillText('Quality changes the splat budget now; resolution applies on the next VR entry.', 48, y + 8);
+        ctx.fillText('Quality takes effect now; resolution applies the next time you enter VR.', 48, y + 8);
 
         const bb = this.button('back', 48, h - 128, (w - 96 - 16) / 2, 84);
         drawButton(ctx, bb, 'Back', { hover: this.panel.hover === 'back', primary: true, size: 30 });
@@ -344,35 +344,34 @@ export class VrMenu {
     }
 
     private drawAbout(ctx: CanvasRenderingContext2D, w: number, h: number) {
-        drawPanelBackground(ctx, w, h, 'About & credits');
+        drawPanelBackground(ctx, w, h, 'Controls');
         ctx.textAlign = 'left';
         ctx.textBaseline = 'alphabetic';
-        ctx.fillStyle = THEME.text;
-        ctx.font = `600 30px ${THEME.font}`;
-        ctx.fillText(`${BRAND.name} — ${BRAND.tagline}`, 48, 140);
-        ctx.font = `400 26px ${THEME.font}`;
         ctx.fillStyle = THEME.muted;
-        let y = wrapText(ctx, 'A construction-site review experience for Meta Quest 3, built with WebXR.', 48, 184, w - 96, 36);
+        ctx.font = `400 26px ${THEME.font}`;
+        let y = 150;
+        for (const line of [
+            'Left stick — walk, in the direction you are looking.',
+            'Right stick — flick left or right to turn, up or down to change floor.',
+            'Trigger — teleport, open a door, or read a note.',
+            'B — this menu.   Y — reset where you are standing.   X — guided tour.'
+        ]) {
+            y = wrapText(ctx, line, 48, y, w - 96, 36) + 8;
+        }
 
-        y += 22;
+        y += 16;
         ctx.fillStyle = THEME.text;
         ctx.font = `600 28px ${THEME.font}`;
-        ctx.fillText('Scene', 48, y);
+        ctx.fillText('This site', 48, y);
         y += 40;
         ctx.fillStyle = THEME.muted;
         ctx.font = `400 26px ${THEME.font}`;
         const c = this.actions.site.credits;
-        y = wrapText(ctx, `“${c.sceneTitle}” by ${c.sceneAuthor}, licensed ${c.sceneLicense}.`, 48, y, w - 96, 36);
-        y = wrapText(ctx, `Changes: ${c.changes}`, 48, y + 4, w - 96, 34);
-
-        y += 22;
-        ctx.fillStyle = THEME.text;
-        ctx.font = `600 28px ${THEME.font}`;
-        ctx.fillText('Technology', 48, y);
-        y += 40;
-        ctx.fillStyle = THEME.muted;
-        ctx.font = `400 26px ${THEME.font}`;
-        y = wrapText(ctx, TECH_CREDIT, 48, y, w - 96, 34);
+        // The recorded scenes are CC BY: naming the author and the licence is a condition of use.
+        y = wrapText(ctx, c.sceneLicenseUrl
+            ? `“${c.sceneTitle}” by ${c.sceneAuthor}, ${c.sceneLicense}.`
+            : `${c.sceneTitle}, ${c.sceneAuthor}.`, 48, y, w - 96, 36);
+        y = wrapText(ctx, c.changes, 48, y + 4, w - 96, 34);
 
         const bb = this.button('back', 48, h - 128, w - 96, 84);
         drawButton(ctx, bb, 'Back', { hover: this.panel.hover === 'back', primary: true, size: 30 });

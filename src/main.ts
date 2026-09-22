@@ -1,4 +1,4 @@
-// SiteXR — Immersive Construction Review. Bootstraps the splat viewer for the chosen site,
+// SiteXR — walk a site before it is built. Bootstraps the splat viewer for the chosen site,
 // decides between immersive VR and the desktop walkthrough, and wires the SiteXR layer.
 import { Vec3, platform } from 'playcanvas';
 import type { AppBase, Entity, GSplatComponent } from 'playcanvas';
@@ -338,7 +338,9 @@ const main = async () => {
         let disposed = false;
 
         events.on('progress:changed', (p: number) => {
-            if (!state.loaded) screens.setProgress(5 + p * 0.9, p < 100 ? 'Streaming site capture…' : 'Building the site…');
+            if (!state.loaded) screens.setProgress(5 + p * 0.9, p < 100
+                ? (site.kind === 'design' ? 'Loading the model…' : 'Loading the site capture…')
+                : 'Building the site…');
         });
 
         collision = await internals.collision;
