@@ -7,7 +7,7 @@
 
 export const BRAND = {
     name: 'SiteXR',
-    tagline: 'Immersive Construction Review'
+    tagline: 'Walk a site before it is built'
 };
 
 export const ASSETS = {
@@ -83,16 +83,16 @@ export const MODES: Mode[] = [
     {
         id: 'capture',
         name: 'Captured Sites',
-        tagline: 'Reality capture · Gaussian splats',
-        blurb: 'Walk real sites recorded as 3D scans: earthworks, heavy plant and a floor under construction, at the scale and condition they were captured in.',
+        tagline: 'Real places, recorded on site',
+        blurb: 'Walk real places as they were on the day: dug ground, heavy plant and a floor being built, at the size and in the state they were found.',
         audience: 'for site teams reviewing what is actually there'
     },
     {
         id: 'design',
         name: 'Design Models',
-        tagline: 'BIM · Revit and IFC models',
-        blurb: 'Walk a building information model at full size, on both floors and from the approach, the way it would be reviewed before anything is built.',
-        audience: 'for design and BIM teams reviewing what is drawn'
+        tagline: 'Buildings as they were drawn',
+        blurb: 'Walk a building at full size before any of it is built, inside and out, the way it would be reviewed.',
+        audience: 'for design teams reviewing what is drawn'
     }
 ];
 
@@ -128,14 +128,11 @@ export type Site = {
     credits: Credits;
 };
 
-export const TECH_CREDIT =
-    'Rendered with the PlayCanvas engine and the open-source SuperSplat viewer runtime (MIT).';
-
 const excavator: Site = {
     id: 'excavator',
     kind: 'capture',
-    name: 'Muddy Excavator Site',
-    subtitle: 'Earthworks · tracked excavator · access review',
+    name: 'Excavation Site',
+    subtitle: 'Dug ground, a tracked excavator and the way in',
     blurb: 'Walk the excavation at true scale, inspect the tracked excavator and review ground and access conditions.',
     tag: 'Earthworks',
     poster: 'brand/poster-excavator.webp',
@@ -185,7 +182,7 @@ const excavator: Site = {
         sceneLicense: 'CC BY 4.0',
         sceneLicenseUrl: 'https://creativecommons.org/licenses/by/4.0/',
         sceneSourceUrl: 'https://superspl.at/scene/ded12920',
-        changes: 'Converted to a multi-level-of-detail streaming format, spherical harmonics reduced to one band, and voxel collision data used for navigation.'
+        changes: 'Rescaled and re-encoded so a headset can carry it.'
     }
 };
 
@@ -195,7 +192,7 @@ const komatsu: Site = {
     id: 'komatsu',
     kind: 'capture',
     name: 'Heavy Plant Yard',
-    subtitle: 'Mining haul truck · hydraulic excavator · display yard',
+    subtitle: 'A haul truck and an excavator at full size',
     blurb: 'Stand beside a 290-tonne haul truck and a mining excavator at their real size, and see what heavy plant looks like from the ground.',
     tag: 'Heavy plant',
     poster: 'brand/poster-komatsu.webp',
@@ -245,7 +242,7 @@ const komatsu: Site = {
         sceneLicense: 'CC BY 4.0',
         sceneLicenseUrl: 'https://creativecommons.org/licenses/by/4.0/',
         sceneSourceUrl: 'https://superspl.at/scene/892bab3d',
-        changes: 'Rescaled to metres, the highest detail level dropped and spherical harmonics reduced to one band for the headset, and a navigation grid derived from the splat data.'
+        changes: 'Rescaled and re-encoded so a headset can carry it.'
     }
 };
 
@@ -254,8 +251,8 @@ const komatsu: Site = {
 const scaffold: Site = {
     id: 'scaffold',
     kind: 'capture',
-    name: 'Formwork & Scaffold Floor',
-    subtitle: 'Interior · slab formwork · shoring towers',
+    name: 'Formwork Floor',
+    subtitle: 'A floor being built, under its shoring',
     blurb: 'Walk a floor under construction between shoring towers and check bracing, prop heads and the access lane.',
     tag: 'Interior',
     poster: 'brand/poster-scaffold.webp',
@@ -304,7 +301,7 @@ const scaffold: Site = {
         sceneLicense: 'CC BY 4.0',
         sceneLicenseUrl: 'https://creativecommons.org/licenses/by/4.0/',
         sceneSourceUrl: 'https://superspl.at/scene/73d39431',
-        changes: 'Rescaled to metres, the highest detail level dropped and spherical harmonics reduced to one band for the headset, and a navigation grid derived from the splat data.'
+        changes: 'Rescaled and re-encoded so a headset can carry it.'
     }
 };
 
@@ -315,9 +312,9 @@ const officeBuilding: Site = {
     id: 'office',
     kind: 'design',
     name: 'Office Building',
-    subtitle: 'Revit model \u00b7 two storeys \u00b7 787 elements',
-    blurb: 'Your Revit model at full size, with doors that open. Arrive in the double-height atrium beside the stair, go up to the second floor, and step outside to read the curtain walling from the approach.',
-    tag: 'Revit model',
+    subtitle: 'Two floors, a stair, and doors that open',
+    blurb: 'Your building at full size, with doors that open. Arrive in the double-height atrium beside the stair, go up to the second floor, and step outside to read the curtain walling from the approach.',
+    tag: 'Office',
     poster: 'private/poster-office.webp',
     model: { url: 'private/office-building.glb' },
     collision: { type: 'mesh', url: 'private/office-building.glb' },
@@ -371,12 +368,12 @@ const officeBuilding: Site = {
         { title: 'End of tour', text: 'Back in the atrium. Explore freely, or press B for the menu.', x: 8.3, z: 0.3, floor: 0, look: [3.4, 1.9, 2.2], dwell: 6 }
     ],
     credits: {
-        sceneTitle: 'Office Building (Revit model)',
+        sceneTitle: 'Office Building',
         sceneAuthor: 'supplied by the project',
         sceneLicense: 'not for redistribution',
         sceneLicenseUrl: '',
         sceneSourceUrl: '',
-        changes: 'Exported from Revit to IFC4, triangulated with IfcOpenShell, node transforms baked in, meshes merged by material and materials made double-sided so walls read from inside. Fill lights added because a model carries no baked lighting of its own.'
+        changes: 'Prepared from Office Building.rvt. Rescaled, lit and merged so a headset can carry it.'
     }
 };
 
@@ -387,10 +384,10 @@ const officeBuilding: Site = {
 const clash1: Site = {
     id: 'clash1',
     kind: 'design',
-    name: 'Clash Detection 1',
-    subtitle: 'Coordination model \u00b7 four floors \u00b7 frame and services',
-    blurb: 'A structural frame with its ducts and joists, four floors of it. Walk between the services at full size and see where they actually run.',
-    tag: 'Coordination',
+    name: 'Frame & Ductwork',
+    subtitle: 'Four floors of frame with the ducts threaded through',
+    blurb: 'Four floors of frame with its ducts and joists. Walk between them at full size and see where everything actually runs.',
+    tag: 'Services',
     poster: 'private/poster-clash1.webp',
     model: { url: 'private/clash1.glb' },
     collision: { type: 'mesh', url: 'private/clash1.glb' },
@@ -413,22 +410,22 @@ const clash1: Site = {
         { title: 'End of tour', text: 'Back at the arrival point. Press B for the menu.', x: 0, z: 0, floor: 0, look: [-11, 2.2, 0], dwell: 6 }
     ],
     credits: {
-        sceneTitle: 'Clash Detection 1',
+        sceneTitle: 'Frame & Ductwork',
         sceneAuthor: 'supplied by the project',
         sceneLicense: 'not for redistribution',
         sceneLicenseUrl: '',
         sceneSourceUrl: '',
-        changes: 'Revit FBX read with assimp, node transforms baked in, meshes merged to one per material, materials made double-sided and a ground plane added. Units measured from an 18-inch column, not assumed.'
+        changes: 'Prepared from Clash Detection 1.fbx. Coloured by trade, and given ground to stand on.'
     }
 };
 
 const clash2: Site = {
     id: 'clash2',
     kind: 'design',
-    name: 'Clash Detection 2',
-    subtitle: 'Coordination model \u00b7 seven levels \u00b7 steel and services',
-    blurb: 'Seven levels of steel frame with the pipework and ducts threaded through it. The kind of model that only starts making sense once you are standing inside it.',
-    tag: 'Coordination',
+    name: 'Steel Frame & Services',
+    subtitle: 'Seven levels of steel, pipes and ducts',
+    blurb: 'Seven levels of steel with the pipes and ducts threaded through. The kind of thing that only starts making sense once you are standing inside it.',
+    tag: 'Steel',
     poster: 'private/poster-clash2.webp',
     model: { url: 'private/clash2.glb' },
     collision: { type: 'mesh', url: 'private/clash2.glb' },
@@ -450,22 +447,22 @@ const clash2: Site = {
         { title: 'End of tour', text: 'Back at the arrival point. Press B for the menu.', x: 29.8, z: -29.8, floor: 0, look: [14, 3.0, -20], dwell: 6 }
     ],
     credits: {
-        sceneTitle: 'Clash Detection 2',
+        sceneTitle: 'Steel Frame & Services',
         sceneAuthor: 'supplied by the project',
         sceneLicense: 'not for redistribution',
         sceneLicenseUrl: '',
         sceneSourceUrl: '',
-        changes: 'FBX flattened on load because assimp aborts on this file\u2019s 33,000 nodes, then baked, merged to one mesh per material, made double-sided and given a ground plane.'
+        changes: 'Prepared from Clash Detection 2.fbx. Colours toned down, and given ground to stand on.'
     }
 };
 
 const design1: Site = {
     id: 'design1',
     kind: 'design',
-    name: 'Design Review 1',
-    subtitle: 'Revit model \u00b7 curtain walling, railings, solar array',
-    blurb: 'An architectural model on its own terrain. Start inside, then step out to read the glazed elevation, the terrace railings and the ground-mounted solar array.',
-    tag: 'Revit model',
+    name: 'Hillside House',
+    subtitle: 'Timber and glass on a sloping site',
+    blurb: 'A house on its own sloping ground. Start inside, then step out to read the glazed elevation, the terrace railings and the ground-mounted solar array.',
+    tag: 'House',
     poster: 'private/poster-design1.webp',
     model: { url: 'private/design1.glb' },
     collision: { type: 'mesh', url: 'private/design1.glb' },
@@ -488,12 +485,12 @@ const design1: Site = {
         { title: 'End of tour', text: 'Back at the arrival point. Press B for the menu.', x: 0, z: 2, floor: 0, look: [8, 1.5, 6], dwell: 6 }
     ],
     credits: {
-        sceneTitle: 'Design Review 1',
+        sceneTitle: 'Hillside House',
         sceneAuthor: 'supplied by the project',
         sceneLicense: 'not for redistribution',
         sceneLicenseUrl: '',
         sceneSourceUrl: '',
-        changes: 'Revit FBX read with assimp and rescaled from feet, verified against a door leaf at 6.65 units. Transforms baked, meshes merged to one per material, materials double-sided, ground plane added.'
+        changes: 'Prepared from Design Review 1.fbx. Coloured by trade, and given ground to stand on.'
     }
 };
 

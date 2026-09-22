@@ -135,7 +135,7 @@ const runViewport = async (label, viewport, { mockVr = false } = {}) => {
     check(`${label}: no SuperSplat branding in visible text`, !info.superSplat);
     check(`${label}: no localhost wording in visible text`, !info.localhost);
     check(`${label}: no page scrollbar`, !info.scrollable);
-    check(`${label}: VR entry gating`, mockVr ? /VR/.test(info.enterSub) : /Desktop/.test(info.enterSub), info.enterSub);
+    check(`${label}: VR entry gating`, mockVr ? /headset/i.test(info.enterSub) : /computer/i.test(info.enterSub), info.enterSub);
     check(`${label}: title`, info.title.startsWith('SiteXR'), info.title);
     if (urlArg !== -1) check(`${label}: served over HTTPS`, base.startsWith('https://'), base);
 

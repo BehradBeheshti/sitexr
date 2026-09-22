@@ -4,8 +4,8 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#0e1218" />
-    <meta name="description" content="SiteXR — Immersive Construction Review. Walk a captured excavation site in VR on Meta Quest 3." />
-    <title>SiteXR — Immersive Construction Review</title>
+    <meta name="description" content="SiteXR — walk a construction site in VR on Meta Quest 3, whether it was recorded on site or only drawn." />
+    <title>SiteXR — walk a site before it is built</title>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230e1218'/%3E%3Cpath d='M14 44h36v6H14zM18 22l14-10 14 10v6H18z' fill='%23f5a623'/%3E%3C/svg%3E" />
     <link rel="stylesheet" href="/src/styles.css" />
 </head>
@@ -19,23 +19,23 @@
         <header class="brand">
             <span class="brand-mark" aria-hidden="true"></span>
             <span class="brand-name">SiteXR</span>
-            <span class="brand-tag">Immersive Construction Review</span>
+            <span class="brand-tag">Walk a site before it is built</span>
         </header>
 
         <div class="card" role="dialog" aria-labelledby="site-title">
-            <div class="modes" id="modes" role="group" aria-label="Choose an experience"></div>
+            <div class="modes" id="modes" role="group" aria-label="Choose a mode"></div>
             <div class="mode-bar" id="mode-bar" hidden>
                 <span class="mode-current"><span class="mode-dot"></span><span id="mode-name"></span></span>
-                <button class="link" id="change-mode">Change experience</button>
+                <button class="link" id="change-mode">Change mode</button>
             </div>
             <div class="sites" id="sites" role="group" aria-label="Choose a site"></div>
-            <p class="eyebrow" id="site-eyebrow">Site capture · Reality model</p>
-            <h1 id="site-title">Muddy Excavator Site</h1>
+            <p class="eyebrow" id="site-eyebrow">Site capture · Dug ground, a tracked excavator and the way in</p>
+            <h1 id="site-title">Excavation Site</h1>
             <p class="lede" id="site-lede">Walk the excavation at true scale, inspect the tracked excavator and review ground and access conditions.</p>
 
             <div class="progress" id="progress" aria-live="polite">
                 <div class="bar"><span id="progress-fill"></span></div>
-                <div class="progress-row"><span id="progress-label">Preparing site survey…</span><span id="progress-pct">0%</span></div>
+                <div class="progress-row"><span id="progress-label">Getting the site ready…</span><span id="progress-pct">0%</span></div>
             </div>
 
             <button id="enter" class="enter" disabled>
@@ -48,7 +48,7 @@
         <footer class="foot">
             <button class="link" id="open-settings">Comfort settings</button>
             <span class="dot"></span>
-            <button class="link" id="open-credits">Credits</button>
+            <button class="link" id="open-credits">Controls</button>
             <button class="link" id="open-watch" hidden>Watch a live session</button>
         </footer>
     </section>
@@ -92,18 +92,18 @@
         <div class="modal-card">
             <h2>Comfort settings</h2>
             <div class="rows" id="settings-rows"></div>
-            <p class="muted">Quality changes the splat budget immediately; the VR render resolution applies on the next VR entry.</p>
+            <p class="muted">Quality takes effect straight away; the VR resolution applies the next time you enter VR.</p>
             <div class="modal-actions"><button class="hud-btn" id="settings-defaults">Defaults</button><button class="hud-btn primary" data-close>Done</button></div>
         </div>
     </div>
 
     <div id="modal-credits" class="modal" hidden>
         <div class="modal-card">
-            <h2>Credits</h2>
-            <p><strong>Current site</strong><br /><span id="credit-scene"></span></p>
-            <p><strong>All sites</strong><br />“Muddy Excavator Site” by dok11 · “こまつの杜 (Komatsu no Mori)” by gnehs · “Construction next day” by redmancg — each licensed <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>, adapted for streaming and navigation.</p>
-            <p><strong>Technology</strong><br />Rendered with the <a href="https://playcanvas.com" target="_blank" rel="noopener">PlayCanvas engine</a> and the open-source SuperSplat viewer runtime (MIT). Controller models from the WebXR Input Profiles project (Apache-2.0).</p>
-            <p><strong>Controls</strong><br />VR: left stick walk · right stick turn · trigger teleport · B menu · Y reset · X tour · A/trigger select.<br />Desktop: drag to look · click the ground to walk · W A S D · R reset · T tour · M menu.</p>
+            <h2>Controls</h2>
+            <p><strong>In the headset</strong><br />Left stick to walk · right stick to turn, or up and down to change floor · trigger to teleport, open a door or read a note · B for the menu · Y to reset where you are standing · X for the guided tour.</p>
+            <p><strong>On a computer</strong><br />Drag to look · click the ground to walk · W A S D · R to reset · T for the tour · M for the menu.</p>
+            <p><strong>This site</strong><br /><span id="credit-scene"></span></p>
+            <p class="muted small">The three recorded sites are by dok11, gnehs and redmancg, each licensed <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a> and adapted here for streaming and walking around.</p>
             <div class="modal-actions"><button class="hud-btn primary" data-close>Close</button></div>
         </div>
     </div>

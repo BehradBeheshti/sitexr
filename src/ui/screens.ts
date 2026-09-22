@@ -260,7 +260,12 @@ export class Screens {
         $('site-lede').textContent = s.blurb;
         $('hud-site-name').textContent = s.name;
         const c = s.credits;
-        $('credit-scene').innerHTML = `“${c.sceneTitle}” by ${c.sceneAuthor} — licensed <a href="${c.sceneLicenseUrl}" target="_blank" rel="noopener">${c.sceneLicense}</a>. Source: <a href="${c.sceneSourceUrl}" target="_blank" rel="noopener">original scene</a>.<br /><span class="muted">Changes: ${c.changes}</span>`;
+        // Only the public scenes carry a licence link; the supplied models have none, and an
+        // empty href renders as a dead link.
+        const origin = c.sceneLicenseUrl
+            ? `“${c.sceneTitle}” by ${c.sceneAuthor} — <a href="${c.sceneLicenseUrl}" target="_blank" rel="noopener">${c.sceneLicense}</a>, <a href="${c.sceneSourceUrl}" target="_blank" rel="noopener">original scene</a>.<br />`
+            : `${c.sceneTitle}, ${c.sceneAuthor}.<br />`;
+        $('credit-scene').innerHTML = `${origin}<span class="muted">${c.changes}</span>`;
         const bd = document.querySelector<HTMLElement>('.overlay .backdrop');
         if (bd) bd.style.setProperty('--poster', `url('${new URL(s.poster, document.baseURI).href}')`);
     }
@@ -306,10 +311,10 @@ export class Screens {
         this.setProgress(100, 'Site ready');
         const btn = $<HTMLButtonElement>('enter');
         btn.disabled = false;
-        $('enter-sub').textContent = xr ? 'Immersive VR · Meta Quest' : 'Desktop walkthrough';
+        $('enter-sub').textContent = xr ? 'In the headset · Meta Quest' : 'On this computer';
         $('mode-note').textContent = xr
             ? 'Put on the headset and pull the trigger on Enter Site.'
-            : 'VR headset not detected. Open this page in the Meta Quest Browser for the immersive experience.';
+            : 'No headset here. Open this page in the Meta Quest browser to walk the site in VR.';
     }
 
     setEnterBusy(busy: boolean) {

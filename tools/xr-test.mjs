@@ -83,7 +83,7 @@ const gate = await page.evaluate(() => ({
     sub: document.getElementById('enter-sub')?.textContent,
     hasVR: window.__sitexr?.viewer.state.hasVR
 }));
-check('immersive VR detected, Enter offers VR', /VR/.test(gate.sub ?? '') && gate.hasVR === true, gate.sub);
+check('immersive VR detected, Enter offers VR', /headset/i.test(gate.sub ?? '') && gate.hasVR === true, gate.sub);
 await page.screenshot({ path: join(outDir, '01-welcome.png') });
 
 // ---- enter VR ------------------------------------------------------------------------
