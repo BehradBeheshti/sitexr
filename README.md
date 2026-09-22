@@ -385,6 +385,23 @@ In the headset: **B → Share view**, and a four-letter code appears. On the lap
 site, click **Watch a live session**, type the code. Or skip both and open `?watch=CODE`
 directly, so the projector is already waiting before the headset goes on.
 
+### A projected view that does not stop
+
+The room lives above the site, not inside it. Loading a site tears the viewer down and builds
+a new one, and a presentation should not lose its code and everyone watching each time the
+presenter changes scene. Between sites there is nothing to describe, so nothing is sent and
+the watching screen simply holds its last frame.
+
+The watching screen also judges for itself whether anything is still arriving, rather than
+waiting to be told. A headset put down, a tab closed, a dropped connection and a presenter who
+stopped all look the same from there, and in every one of them the scene stays on screen
+exactly as it was, with the badge saying "Paused" and its dot stopped. It goes back to
+"Watching" on its own the moment packets resume. Relying on the relay to announce a closed
+socket was less reliable than noticing the silence.
+
+While watching, the screen never offers a control. Even mid-load, when the welcome card would
+normally appear with its site list and its Enter button, all of that stays hidden.
+
 ### Why this needs a host that runs code
 
 Two browsers cannot introduce themselves to each other. GitHub Pages only hands out files, so

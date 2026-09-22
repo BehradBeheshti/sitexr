@@ -239,6 +239,50 @@ const fovs = await (async () => {
 check('the watcher adopts the presenter field of view', Math.abs(fovs.got.fov - 70) < 0.1 || fovs.got.horizontal === true,
     JSON.stringify(fovs));
 
+// A presentation must survive the presenter changing scene. The room lives above the site,
+// so the code and the audience stay put while the viewer underneath is torn down and rebuilt.
+const other = siteId === 'office' ? 'excavator' : 'office';
+const codeBefore = await host.evaluate(() => window.__sitexr.share.code);
+await host.evaluate((id) => {
+    const m = window.__sitexr.menu;
+    m.page = 'sites';
+    m.render();
+    m.panel.onButton(`site:${id}`);
+}, other);
+
+let switched = null;
+for (let i = 0; i < 90; i++) {
+    switched = await host.evaluate(() => ({
+        site: window.__sitexr?.site?.id ?? null,
+        sharing: window.__sitexr?.share?.active ?? false,
+        code: window.__sitexr?.share?.code ?? null
+    }));
+    if (switched.site === other) break;
+    await sleep(1000);
+}
+check(`the room survives the presenter changing scene (${siteId} -> ${other})`,
+    switched?.site === other && switched.sharing === true && switched.code === codeBefore,
+    JSON.stringify(switched));
+
+await view
+    .waitForFunction((want) => window.__sitexr?.site?.id === want, { timeout: 600000 }, other)
+    .catch(() => null);
+let followedAfter = null;
+for (let i = 0; i < 40; i++) {
+    followedAfter = await view.evaluate(() => window.__sitexrWatch?.following ?? false);
+    if (followedAfter) break;
+    await sleep(1000);
+}
+check('the watcher follows the presenter to the new scene', followedAfter === true,
+    `watcher on ${await view.evaluate(() => window.__sitexr?.site?.id ?? null)}`);
+
+const watcherChrome = await view.evaluate(() => ({
+    enter: !!document.getElementById('enter')?.hidden,
+    badge: !document.getElementById('watch-badge').hidden
+}));
+check('the watching screen keeps no controls through the change',
+    watcherChrome.enter === true && watcherChrome.badge === true, JSON.stringify(watcherChrome));
+
 // A second presenter cannot hijack a code in use. This has to be a real WebSocket: a page
 // cannot set the Upgrade header on fetch, so a plain fetch tests nothing.
 const busy = await host.evaluate(
@@ -261,9 +305,17 @@ check('a code already in use rejects a second presenter', busy === 'rejected', S
 
 // stopping tells the watcher, rather than leaving a frozen frame
 await host.evaluate(() => window.__sitexr.share.stop());
-await sleep(2500);
-const ended = await view.evaluate(() => document.getElementById('watch-text').textContent ?? '');
-check('stopping tells the watcher', /waiting/i.test(ended), ended);
+let ended = '';
+for (let i = 0; i < 12; i++) {
+    await sleep(1000);
+    ended = await view.evaluate(() => document.getElementById('watch-text').textContent ?? '');
+    if (!/watching/i.test(ended)) break;
+}
+console.log('      host after stop:', JSON.stringify(await host.evaluate(() => ({
+    active: window.__sitexr.share.active, code: window.__sitexr.share.code
+}))));
+check('the watching screen notices the presenter stopped, and holds its frame',
+    /paused/i.test(ended), ended);
 
 const benign = (e) => /favicon|WebGPU|swiftshader|ERR_BLOCKED_BY_CLIENT/i.test(e);
 const real = errors.filter((e) => !benign(e));

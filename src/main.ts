@@ -49,14 +49,26 @@ type Session = {
     dispose: () => void;
     /** Take over the camera from a shared viewpoint (watch mode). */
     follow: (state: ShareState) => void;
-    /** Publish this session's viewpoint, or stop. */
-    share: ShareHost;
+    /** Describe this session's viewpoint for a watcher, or null when it cannot yet. */
+    sampleShare: () => ShareState | null;
 };
 
 const main = async () => {
     const vrSupported = await detectVr();
     // set by the build, not discovered at run time; see RELAY_ENABLED
     const relayOk = RELAY_ENABLED;
+
+    /**
+     * One room for the whole visit.
+     *
+     * It outlives every site: loading a new one tears the viewer down, and a presentation
+     * should not lose its code and everyone watching each time the presenter changes scene.
+     * Between sites there is nothing to describe, so it sends nothing and the watching screen
+     * simply holds its last frame rather than going blank.
+     */
+    const share = new ShareHost(() => session?.sampleShare() ?? null);
+    let menuRepaint: (() => void) | null = null;
+    share.onStatus = () => menuRepaint?.();
     let session: Session | null = null;
     let starting: Promise<Session> | null = null;
 
@@ -217,8 +229,21 @@ const main = async () => {
         watcher = new ShareViewer(code);
         // a support handle: "is anything arriving?" is the first question when a projected
         // view stays blank, and it is not answerable from the outside
-        const diag = { code, received: 0, lastAt: 0, following: false };
+        const diag = { code, received: 0, lastAt: 0, following: false, paused: false };
         Object.defineProperty(window, '__sitexrWatch', { value: diag, configurable: true });
+
+        // The watching screen judges for itself whether anything is still arriving, rather
+        // than waiting to be told. A headset put down, a tab closed, a dropped connection and
+        // a presenter who simply stopped all look the same from here, and in every one of them
+        // the scene stays on screen exactly as it was. A projected view should hold its last
+        // frame and say why, not go blank.
+        window.setInterval(() => {
+            if (!diag.lastAt) return;
+            const quiet = Date.now() - diag.lastAt > 3000;
+            if (quiet === diag.paused) return;
+            diag.paused = quiet;
+            screens.setWatchStatus({ kind: quiet ? 'paused' : 'watching', code });
+        }, 1000);
         watcher.onStatus = (st) => screens.setWatchStatus(st);
         watcher.onState = (shared) => {
             diag.received++;
@@ -395,10 +420,14 @@ const main = async () => {
                 'Drag to look \u00b7 click the ground to walk there \u00b7 W A S D to move \u00b7 click a door to open it';
         }
 
-        // ---- sharing this viewpoint ------------------------------------------------------
+        // ---- describing this viewpoint ---------------------------------------------------
         // Fifteen samples a second of where the head is and what has been touched. The model
         // is already on the watcher's machine, so this is all that has to travel.
-        const shareHost = new ShareHost(() => {
+        //
+        // The room itself is owned above, not here: a site switch disposes this session, and
+        // a presentation should not lose its code and its audience every time the presenter
+        // changes scene.
+        const sampleShare = (): ShareState | null => {
             const p = rig.camera.getPosition();
             const f = rig.camera.forward;
             const state: ShareState = {
@@ -418,12 +447,12 @@ const main = async () => {
             state.c = markers.cardOpen ? (markers.openPoiId ?? null) : null;
             state.t = tour.active ? tour.index : null;
             return state;
-        });
+        };
 
-        app.on('update', () => shareHost.tick());
+        app.on('update', () => share.tick());
 
-        // the code panel shows a live count, so it has to repaint when someone joins
-        shareHost.onStatus = () => {
+        // the code panel shows a live count, so it repaints when someone joins
+        menuRepaint = () => {
             if (menu.isOpen && menu.page === 'share') menu.render();
         };
 
@@ -433,15 +462,15 @@ const main = async () => {
             replayTutorial: () => tutorial.start(),
             share: {
                 available: relayOk,
-                active: () => shareHost.active,
-                code: () => shareHost.code,
-                viewers: () => shareHost.viewers,
+                active: () => share.active,
+                code: () => share.code,
+                viewers: () => share.viewers,
                 watchUrl: (code: string) =>
                     `${location.origin}${location.pathname}?watch=${code}`,
                 start: () => {
-                    void shareHost.start().then(() => menu.render()).catch(() => menu.render());
+                    void share.start().then(() => menu.render()).catch(() => menu.render());
                 },
-                stop: () => shareHost.stop()
+                stop: () => share.stop()
             },
             switchSite: (id: string) => {
                 void (async () => {
@@ -636,7 +665,7 @@ const main = async () => {
 
         // Non-enumerable QA handle for the headless smoke test (not a user-facing control).
         Object.defineProperty(window, '__sitexr', {
-            value: { viewer, rig, menu, tutorial, markers, tour, settings, doors, share: shareHost, pois: site.pois, site },
+            value: { viewer, rig, menu, tutorial, markers, tour, settings, doors, share, pois: site.pois, site },
             enumerable: false,
             configurable: true
         });
@@ -665,7 +694,7 @@ const main = async () => {
 
         return {
             site,
-            share: shareHost,
+            sampleShare,
             follow: (shared: ShareState) => {
                 following = true;
                 state.inputEnabled = false;
